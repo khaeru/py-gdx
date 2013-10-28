@@ -2,10 +2,9 @@
 # GAMS GDX interface
 # 2012-06-18 Paul Natsuo Kishimoto <mail@paul.kishimoto.name>
 """
-
 For those reading the code: Using the Python 'set' class makes the code in this
-module simpler, but unfortunately leads to confusing semantics because the 'Set'
-is also one of the main types of GAMS symbols. To improve clarity in the
+module simpler, but unfortunately leads to confusing semantics because the
+'Set' is also one of the main types of GAMS symbols. To improve clarity in the
 comments below, capitalized 'Set' is used for the latter.
 
 TODO: document
@@ -30,15 +29,12 @@ __all__ = [
   'enumarray',
   'set_data_type',
   'File',
-# commented: there's not much use in creating a GDX object directly, for now
-#  'GDX',
-# commented: only reading supported at the moment. Creating these will make
-# sense once writing is supported
-#  'Symbol',
-#  'Equation',
-#  'Set', 
-#  'Parameter',
-#  'Variable',
+  #'GDX',  # commented: not much use in creating a GDX object directly, for now
+  #'Symbol',    # commented: only reading supported at the moment. Creating
+  #'Equation',  # these will make sense once writing is supported
+  #'Set',
+  #'Parameter',
+  #'Variable',
   ]
 
 # string representations of API constants for G(a)MS D(ata) T(ypes)
@@ -47,7 +43,7 @@ type_str = {
   gdxcc.GMS_DT_PAR: 'parameter',
   gdxcc.GMS_DT_VAR: 'variable',
   gdxcc.GMS_DT_EQU: 'equation',
-  gdxcc.GMS_DT_ALIAS: None, # aliases not created; see File.__init__()
+  gdxcc.GMS_DT_ALIAS: None,  # aliases not created; see File.__init__()
   }
 
 # string representations of API constants for G(a)MS VAR(iable) TYPE(s)
@@ -67,6 +63,7 @@ vartype_str = {
 
 NULL = None
 RETURN = lambda x: x
+
 
 def set_data_type(t):
   global NULL, RETURN
@@ -123,8 +120,8 @@ class GDX:
     Optional positional arguments *args* are passed to the API.
     """
     if method not in self.__valid:
-      raise NotImplementedError('GDX.call() cannot invoke ' +
-        'gdxcc.gdx{}'.format(method))
+      raise NotImplementedError(('GDX.call() cannot invoke '
+                                 'gdxcc.gdx{}').format(method))
     ret = getattr(gdxcc, 'gdx{}'.format(method))(self._handle, *args)
     if ret[0]:
       # unwrap a 1-element array
@@ -133,7 +130,8 @@ class GDX:
       else:
         return ret[1:]
     else:
-      raise Exception('gdx{}: {}'.format(method, self.call('ErrorStr', ret[1])))
+      raise Exception('gdx{}: {}'.format(method, self.call('ErrorStr',
+                      ret[1])))
 
   def __getattr__(self, name):
     """Name mangling for method invocation without :func:`call`."""
@@ -168,7 +166,7 @@ class File:
 
   If *match_domains* is True (the default), attempt to match each dimension of
   the domain of each GAMS Parameter and Variable to a Set in the same file.
-  
+
   Once loaded, individual GAMS symbols are available as attributes of the File
   instance. For example, a GAMS parameter 'myparam' can be accessed:
 
@@ -265,6 +263,7 @@ class File:
     domain_index = symbol._domain_index
     # placeholders for the domain
     domain = [None] * symbol.dim
+
     def valid_parent(parent_symbol, child_symbol, domain_set):
       """Shortcut method.
 
@@ -280,9 +279,9 @@ class File:
       More computationally intensive conditions are placed last.
       """
       return parent_symbol.dim == 1 \
-        and parent_symbol != child_symbol \
-        and child_symbol not in getattr(parent_symbol, 'domain', []) \
-        and parent_symbol.domain_sets()[0].issuperset(domain_set)
+          and parent_symbol != child_symbol \
+          and child_symbol not in getattr(parent_symbol, 'domain', []) \
+          and parent_symbol.domain_sets()[0].issuperset(domain_set)
     # the reported dimension (from gdxSymbolInfo) and the dimension of
     # actual data (from gdxDataReadStr) always agree, but the reported
     # domain (from gdxSymbolGetDomain) can be incorrect. See which is the
@@ -412,11 +411,11 @@ class Symbol:
 
   def __str__(self):
     return '{} {}({}): {}'.format(self.type.title(), self.name,
-      ','.join([s.name for s in self.domain]), self.description)
+           ','.join([s.name for s in self.domain]), self.description)
 
   def __repr__(self):
     return '{} {}({}): {}'.format(self.type.title(), self.name,
-      ','.join([s.name for s in self.domain]), self.description)
+           ','.join([s.name for s in self.domain]), self.description)
 
   def domain_sets(self):
     """Return a list of sets with the domain of GAMS symbol data.
