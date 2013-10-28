@@ -96,7 +96,7 @@ class enumarray:
                     raise ValueError(("label '{}' does not appear in dimension"
                                       " {}: {}").format(k_, i, self.labels[i]))
                 result.append(_result)
-        return result
+        return tuple(result)
 
     def __getitem__(self, key):
         try:
