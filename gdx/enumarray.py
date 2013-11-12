@@ -83,18 +83,26 @@ class enumarray:
             elif isinstance(k, int):  # integers: use directly as single index
                 result.append(k)
             else:  # other contents
-                if k in self.labels[i]:  # key is a label; wrap it
+                try:
                     result.append(self.labels[i].index(k))
                     continue
+                except ValueError:
+                    pass
+                if isinstance(k, type(self.labels[i][0])):
+                    # key is of same type as the labels for this dimension, so
+                    # it is probably a single label
+                    k = (k,)
                 # look up elements of k (may only be 1) in the list of labels
                 # for this dimension
                 _result = []
                 try:
                     for k_ in k:
                         _result.append(self.labels[i].index(k_))
-                except ValueError as e:  # one of the labels was incorrect
-                    raise ValueError(("label '{}' does not appear in dimension"
-                                      " {}: {}").format(k_, i, self.labels[i]))
+                except ValueError:  # one of the labels was incorrect
+                    raise ValueError(
+                        ("label '{}' in slice/index {} does not appear in "
+                         "dimension {}: {}").format(k_, k, i, self.labels[i]))\
+                        from None
                 result.append(_result)
         return tuple(result)
 
@@ -114,8 +122,8 @@ class enumarray:
 
 if __name__ == '__main__':
     ea = enumarray(labels=(('a', 'b', 'c'), ('d', 'e')),
-                   data=numpy.arange(6).reshape((3,2)))
+                   data=numpy.arange(6).reshape((3, 2)))
     print(ea)
-    print(ea['b',:])
-    print(ea[('a','c'),-1])
-    print(ea[:,'e'])
+    print(ea['b', :])
+    print(ea[('a', 'c'), -1])
+    print(ea[:, 'e'])
