@@ -77,14 +77,20 @@ class enumarray:
         for i, k in enumerate(key):  # i is dimension, k is key contents
             if type(k) == slice:  # slice objects
                 if k == slice(None):  # an 'all' slice (ie. ":") passes through
-                    result.append(k)
+                    result.append(range(self._data.shape[i]))
                 else:  # convert all other slices to indices
                     result.append(range(*k.indices(self._data.shape[i])))
             elif isinstance(k, int):  # integers: use directly as single index
                 result.append(k)
             else:  # other contents
-                try:
-                    result.append(self.labels[i].index(k))
+                try:  # an iterable of integers
+                    if all([isinstance(k_, int) for k_ in k]):
+                        result.append(k)
+                        continue
+                except TypeError:
+                    pass
+                try:  # a single label
+                    result.append((self.labels[i].index(k),))
                     continue
                 except ValueError:
                     pass
@@ -104,7 +110,7 @@ class enumarray:
                          "dimension {}: {}").format(k_, k, i, self.labels[i]))\
                         from None
                 result.append(_result)
-        return tuple(result)
+        return numpy.ix_(*result)
 
     def __getitem__(self, key):
         try:
