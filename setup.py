@@ -9,4 +9,4 @@ setup(name='PyGDX',
       author_email='mail@paul.kishimoto.name',
       url='https://github.com/khaeru/py-gdx',
       packages=['gdx'],
-     )
+      )
