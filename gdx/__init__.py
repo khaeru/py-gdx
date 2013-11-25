@@ -474,18 +474,20 @@ class Set(Symbol):
         # don't load twice
         if self._loaded:
             return
-        self.elements = []
+        elements = []
         self.unordered = [set() for i in range(self.dim)]
         records = self._api.data_read_str_start(self._index)
         for i in range(records):
             indices, value, afdim = self._api.data_read_str()
             if self.dim == 1:
-                self.elements.append(indices[0])
+                elements.append(indices[0])
                 self.unordered[0].add(indices[0])
             else:
-                self.elements.append(tuple(indices))
+                elements.append(tuple(indices))
                 for j in range(self.dim):
                     self.unordered[j].add(indices[j])
+        # TODO possibly change this once Set objects are writeable
+        self.elements = tuple(elements)
         self._loaded = True
 
     def domain_sets(self):
