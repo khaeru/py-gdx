@@ -531,6 +531,9 @@ class Set(Symbol):
         else:
             return 1000
 
+    def index(self, key):
+        """Shorthand to get the index of *key* in self.elements."""
+        return self.elements.index(key)
 
 class Parameter(Symbol):
     """Representation of a GAMS parameter or variable.
