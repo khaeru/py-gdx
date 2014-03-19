@@ -188,7 +188,7 @@ class File:
         self.symbol_count, self.element_count = self._api.system_info()
         # read symbols
         set_queue = Queue()
-        for symbol_num in range(self.symbol_count):
+        for symbol_num in range(self.symbol_count + 1):
             name, junk, type_code = self._api.symbol_info(symbol_num)
             name = name.lower()
             self._index[symbol_num] = name
@@ -332,8 +332,8 @@ class File:
                     continue
                 # two or more Sets are candidates
                 # the highest-level Set
-                best = min([c.depth() for c in candidates])
-                c2 = list(filter(lambda c: c.depth() == best, candidates))
+                best = min([c.depth for c in candidates])
+                c2 = list(filter(lambda c: c.depth == best, candidates))
                 if len(c2) == 1:
                     domain[i] = c2.pop()
                     continue
@@ -506,6 +506,7 @@ class Set(Symbol):
         """Implementation of __len__"""
         return len(self.elements)
 
+    @property
     def depth(self):
         """Return the 'depth' of this GAMS Set.
 
@@ -527,7 +528,7 @@ class Set(Symbol):
         if self.name == '*':
             return 0
         elif hasattr(self, 'domain'):
-            return min([d.depth() for d in self.domain]) + 1
+            return min([d.depth for d in self.domain]) + 1
         else:
             return 1000
 
