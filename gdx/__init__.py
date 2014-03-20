@@ -17,9 +17,13 @@ if sys.version_info[0] >= 3:
     from queue import Queue
 else:
     from Queue import Queue
+from sys import maxsize
+
+import pandas as pd
 
 from .enumarray import enumarray
 import gdxcc
+
 
 # 'from gdx import *' will only bring these items into the namespace.
 __all__ = [
@@ -57,24 +61,6 @@ vartype_str = {
     gdxcc.GMS_VARTYPE_SEMIINT: 'semiint',
     gdxcc.GMS_VARTYPE_MAX: 'max',
     }
-
-NULL = None
-RETURN = lambda x: x
-
-
-def set_data_type(t):
-    global NULL, RETURN
-    if t == 'plain':
-        NULL = None
-        RETURN = lambda x: x
-    elif t == 'numpy':
-        import numpy
-        NULL = numpy.NaN
-        RETURN = lambda x: numpy.array(x)
-    else:
-        raise ValueError
-
-set_data_type('plain')
 
 
 class GDX:
@@ -127,8 +113,14 @@ class GDX:
             else:
                 return ret[1:]
         else:
-            raise Exception('gdx{}: {}'.format(method, self.call('ErrorStr',
-                            ret[1])))
+            error_str = self.call('ErrorStr', ret[1])
+            if method == 'OpenRead' and (error_str ==
+                    'No such file or directory'):
+                raise FileNotFoundError("[gdx{}] {}: '{}'".format(method,
+                                                                  error_str,
+                                                                  args[0]))
+            else:
+                raise Exception('gdx{}: {}'.format(method, error_str))
 
     def __getattr__(self, name):
         """Name mangling for method invocation without :func:`call`."""
@@ -175,26 +167,25 @@ class File:
     Symbols are also available through :func:`get_symbol` and
     :func:`get_symbol_by_index`.
     """
-    def __init__(self, filename='', mode='r', match_domains=True, lazy=False):
+    def __init__(self, filename='', mode='r', lazy=False):
         """Constructor."""
-        self._match_domains = match_domains
-        self._symbols = {}
-        self._index = {}
         # load the GDX API
+        self._lazy = lazy
         self._api = GDX()
-        # TODO: check that 'filename' exists
         self._api.open_read(filename)
         self.version, self.producer = self._api.file_version()
         self.symbol_count, self.element_count = self._api.system_info()
         # read symbols
+        self._symbols = {}
+        self._index = [None for _ in range(self.symbol_count + 1)]
         set_queue = Queue()
         for symbol_num in range(self.symbol_count + 1):
-            name, junk, type_code = self._api.symbol_info(symbol_num)
+            name, _, type_code = self._api.symbol_info(symbol_num)
             name = name.lower()
             self._index[symbol_num] = name
             if type_code == gdxcc.GMS_DT_ALIAS:
                 # aliases are stored as a reference to the aliased symbol
-                junk, junk2, desc = self._api.symbol_info_x(symbol_num)
+                _, __, desc = self._api.symbol_info_x(symbol_num)
                 parent = desc.replace('Aliased with ', '').lower()
                 assert parent in self._symbols
                 self._symbols[name] = self._symbols[parent]
@@ -202,235 +193,145 @@ class File:
             elif type_code == gdxcc.GMS_DT_EQU:
                 # equations: not yet implemented
                 continue
-            # create the symbol object
-            symbol = Symbol.create(type_code, self, symbol_num)
-            # load Sets immediately
-            if isinstance(symbol, Set):
-                symbol._load()
-                # put Sets into a queue
-                set_queue.put(symbol)
-            # store the object
-            self._symbols[name] = symbol
-        # process Sets. Because symbols are not stored in any particular order
-        # in the GDX file, Sets are not necessarily loaded before others which
-        # reference them as domain dimensions. In order to make multiple
-        # passes, use a queue and reinsert objects which need to be rechecked
-        while not set_queue.empty():
-            symbol = set_queue.get()
-            # try to match the domain
-            if not self._match_domain(symbol):
-                # unsuccessful, return to the queue
-                set_queue.put(symbol)
-        # process Parameters (also Variables, because of class inheritance, see
-        # below). Load and optionally match the domain
-        if not lazy:
-            for symbol in self.parameters():
-                symbol._load()
-                if self._match_domains:
-                    self._match_domain(symbol)
+            # create and store the symbol object
+            self._symbols[name] = Symbol.create(type_code, self, symbol_num,
+                                                lazy)
 
     def sets(self):
         """Return a list of all Set objects."""
-        if sys.version_info[0] >= 3:
-            values = self._symbols.values()
-        else:
-            values = self._symbols.itervalues()
         return list(filter(lambda s: isinstance(s, Set) and s.name != '*',
-                    values))
+                    self._symbols.values()))
 
     def parameters(self):
         """Return a list of all Parameter objects."""
-        if sys.version_info[0] >= 3:
-            values = self._symbols.values()
-        else:
-            values = self._symbols.itervalues()
-        return list(filter(lambda s: isinstance(s, Parameter), values))
-
-    def _match_domain(self, symbol):
-        """Match each dimension of the domain of *symbol* to a GAMS Set."""
-        # TODO: make this method less terribly slow
-        if symbol.dim == 0 or hasattr(symbol, 'domain') or symbol.name == '*':
-            # domain is always OK:
-            # - for scalars
-            # - if the 'domain' attribute was previously set
-            # - for the root set
-            return True
-        # grab some information about the symbol
-        s = symbol.domain_sets()
-        # domain_index contains the indexes of each of the symbols in this
-        # symbol's domain
-        domain_index = symbol._domain_index
-        # placeholders for the domain
-        domain = [None] * symbol.dim
-
-        def valid_parent(parent_symbol, child_symbol, domain_set):
-            """Shortcut method.
-
-            A candidate *parent_symbol* is a match for a particular domain
-            dimension of *child_symbol* with elements *domain_set* iff:
-
-            * it is one-dimensional
-            * it is not the same object as *child_symbol*
-            * it does not have *child_symbol* as a member of its own domain
-              (avoid circular references)
-            * its elements are a superset of the elements in the *domain_set*
-
-            More computationally intensive conditions are placed last.
-            """
-            return parent_symbol.dim == 1 \
-                and parent_symbol != child_symbol \
-                and child_symbol not in getattr(parent_symbol, 'domain', []) \
-                and parent_symbol.domain_sets()[0].issuperset(domain_set)
-        # the reported dimension (from gdxSymbolInfo) and the dimension of
-        # actual data (from gdxDataReadStr) always agree, but the reported
-        # domain (from gdxSymbolGetDomain) can be incorrect. See which is the
-        # case:
-        if len(s) == len(domain_index):
-            # the reported domain is at least the correct *length*. Check each
-            # item in turn
-            for i, d in enumerate(domain_index):
-                parent = self._symbols[self._index[d]]
-                s2 = parent.domain_sets()
-                if len(s2) == 1 and s2[0].issuperset(s[i]):
-                    domain[i] = parent
-                    continue
-            # if there are 'None' elements in domain at this point, then the
-            # info reported by the API was wrong
-        else:
-            # the reported domain is not the correct length; need to guess
-            for i in range(symbol.dim):
-                # if there is no content along this dimension, there is no
-                # basis for guessing. Use the root set by default
-                if len(s[i]) == 0:
-                    domain[i] = self._symbols['*']
-                    continue
-                # try the sets from the reported domain, in case one of them is
-                # actually correct
-                candidates = set()
-                for d in filter(lambda j: j != 0, domain_index):
-                    parent = self.get_symbol_by_index(d)
-                    if valid_parent(parent, symbol, s[i]):
-                        candidates.add(parent)
-                # one of them matched; might as well go with it
-                if len(candidates) == 1:
-                    domain[i] = candidates.pop()
-                    continue
-                else:
-                    # either zero or >2 matches; in the latter case, code below
-                    # will give a better result. Clear the result
-                    candidates = set()
-                # second heuristic: try *all* sets
-                for parent in self.sets():
-                    if valid_parent(parent, symbol, s[i]):
-                        candidates.add(parent)
-                if len(candidates) == 0:
-                    # really have no clue at this point, use *
-                    domain[i] = self._symbols['*']
-                    continue
-                elif len(candidates) == 1:
-                    domain[i] = candidates.pop()
-                    continue
-                # two or more Sets are candidates
-                # the highest-level Set
-                best = min([c.depth for c in candidates])
-                c2 = list(filter(lambda c: c.depth == best, candidates))
-                if len(c2) == 1:
-                    domain[i] = c2.pop()
-                    continue
-                # the largest set. This is highly arbitrary; could also use the
-                # smallest set
-                largest = max([len(c.elements) for c in c2])
-                c3 = list(filter(lambda c: len(c.elements) == largest, c2))
-                if len(c3) == 1:
-                    domain[i] = c3.pop()
-        if domain.count(None) == 0:
-            symbol.domain = domain
-            return True
-        else:
-            return False
+        return list(filter(lambda s: isinstance(s, Parameter),
+            self._symbols.values()))
 
     def get_symbol(self, name):
         """Retrieve the GAMS symbol *name*."""
-        return self._symbols[name]
+        result = self._symbols[name]
+        if self._lazy and not result._loaded:
+            result.load()
+        return result
 
     def get_symbol_by_index(self, index):
         """Retrieve the GAMS symbol stored at the *index* -th file position."""
-        return self._symbols[self._index[index]]
+        return self.get_symbol(self._index[index])
 
     def __getattr__(self, name):
         """Access symbols as object attributes."""
-        if name in self._symbols:
-            if not self._symbols[name]._loaded:
-                self._symbols[name]._load()
-                if self._match_domains:
-                    self._match_domain(self._symbols[name])
-            return self._symbols[name]
-        else:
-            raise AttributeError(name)
+        try:
+            return self.get_symbol(name)
+        except KeyError as e:
+            raise AttributeError(*e.args)
 
     def __getitem__(self, key):
         """Set element access."""
-        return self.__getattr__(key)
+        if isinstance(key, str):
+            return self.get_symbol(key)
+        elif isinstance(key, int):
+            return self.get_symbol_by_index(key)
+        raise TypeError(key)
 
 
 class Symbol:
     """Base class for GAMS symbols.
 
     To create a new symbol, use the factory method :py:meth:`.create`.
+
+    All symbols have the following attributes:
+    - name -- the symbol's name as declared in GAMS.
+    - dim -- the number of dimensions.
+    - records -- the number of entries in the symbol's data table.
+    - description -- the description or explanatory text assigned to the symbol
+      in GAMS
     """
     # True when symbol data has been loaded
     _loaded = False
 
-    def __init__(self, gdxfile=None, index=0):
+    def __init__(self, gdxfile=None, index=0, lazy=False):
         """Constructor."""
-        if gdxfile:
-            self._api = gdxfile._api
-            self._index = index
+        if gdxfile is None:
+            raise NotImplementedError
+        # Store references to the GDX API used to load this symbol
+        self._file = gdxfile
+        self._api = gdxfile._api
+        self._index = index
+        # Retrieve the name, dimension and type code
         self.name, self.dim, type_code = self._api.symbol_info(index)
-        self.records, userinfo, self.description = self._api.symbol_info_x(
+        # Retrieve the length, variable type and description
+        self.records, vartype, self.description = self._api.symbol_info_x(
             index)
-        # set the type
-        self.type = type_str[type_code]
-        if self.type == 'parameter':
+        # Set the type
+        self.gdx_type = type_str[type_code]
+        if self.gdx_type == 'parameter':
             if self.dim == 0:
-                self.type = 'scalar'
-            self.type = '{} {}'.format(vartype_str[userinfo], self.type)
-        if self.dim > 0 and index != 0:
-            self._domain_index = self._api.symbol_get_domain(index)
-
-    def _load(self):
-        """Load symbol data.
-
-        Each subclass must overload this method to read and store the symbol's
-        data through the API. Currently File.__init__ forcibly loads all
-        defined symbols, but a clever hacker could implement lazy-loading,
-        whereby data or even symbol information are only loaded upon access.
-        """
-        raise NotImplementedError
+                self.gdx_type = 'scalar'
+            self.gdx_type = '{} {}'.format(vartype_str[vartype], self.gdx_type)
+        # Read the indices of the domain for this symbol
+        self._domain_index = None if (self.dim == 0 or index == 0) else \
+            self._api.symbol_get_domain(index)
+        if lazy and isinstance(self, Parameter):
+            return
+        else:
+            self.load()
+    
+    def load(self):
+        if self._loaded:
+            return
+        # Read the elements of the domain directly.
+        self._elements = [list() for _ in range(self.dim)]
+        records = self._api.data_read_str_start(self._index)
+        self._data = {}
+        assert records == self.records
+        for i in range(self.records):
+            indices, value, afdim = self._api.data_read_str()
+            for j, name in enumerate(indices):
+                if name not in self._elements[j]:
+                    self._elements[j].append(name)
+            key = indices[0] if self.dim == 1 else tuple(indices)
+            self._data[key] = value[gdxcc.GMS_VAL_LEVEL]
+        self.domain = [None for _ in range(self.dim)]
+        if self._index == 0:
+            self._loaded = True
+            return
+        parent_elements = [list() for _ in range(self.dim)]
+        if self._domain_index is not None:
+            # Some domain is specified for this Set
+            for i, d in enumerate(self._domain_index):
+                if i >= self.dim:
+                    continue
+                self.domain[i] = self._file.get_symbol_by_index(d)
+                assert set(self.domain[i].idx).issuperset(self._elements[i])
+        for i, d in enumerate(self.domain):
+            if d not in (None, self._file['*']):
+                continue
+            candidate = range(maxsize)
+            for s in self._file.sets() + [self._file['*']]:
+                if s.dim > 1 or s == self:
+                    continue
+                # There is a bit of ambiguity here: could prefer the
+                # highest-level non-* set, or the lowest level.
+                elif set(s.idx).issuperset(self._elements[i]) and (len(s) <
+                    len(candidate)) and s.depth < getattr(candidate,
+                        'depth', maxsize):
+                    candidate = s
+            if isinstance(candidate, Set):
+                self.domain[i] = candidate
 
     def __str__(self):
-        return '{} {}({}): {}'.format(self.type.title(), self.name,
-               ','.join([s.name for s in self.domain]), self.description)
+        """Informal string representation of the Symbol."""
+        return '{} {}({}): {}'.format(self.gdx_type.title(), self.name,
+                                      ','.join([getattr(s, 'name', '?') for s
+                                                in self.domain]),
+                                      self.description)
 
     def __repr__(self):
-        return '{} {}({}): {}'.format(self.type.title(), self.name,
-               ','.join([s.name for s in self.domain]), self.description)
-
-    def domain_sets(self):
-        """Return a list of sets with the domain of GAMS symbol data.
-
-        Every subclass must overload this method to return a list of length
-        Symbol.dim. Each list element is a Python set containing every value
-        for that domain dimension in the GAMS symbol.
-
-        For simple GAMS Sets, these are equivalent to the set itself; but for
-        Parameters, Variables, or GAMS subsets (especially multidimensional
-        subsets) they may be smaller or empty.
-        """
-        raise NotImplementedError
+        """Formal string representation of the Symbol."""
+        return self.__str__()
 
     @staticmethod
-    def create(type_code, gdxfile, index):
+    def create(type_code, gdxfile, index, lazy):
         """Create a new GAMS symbol.
 
         The created symbol is of one of the types named in type_str.
@@ -439,7 +340,7 @@ class Symbol:
         loaded from the symbol at position *index* of the File instance
         *gdxfile*.
         """
-        return globals()[type_str[type_code].title()](gdxfile, index)
+        return globals()[type_str[type_code].title()](gdxfile, index, lazy)
 
 
 class Equation(Symbol):
@@ -451,60 +352,13 @@ class Equation(Symbol):
 
 
 class Set(Symbol):
-    """Representation of a GAMS set.
-
-    Set elements are accessble via indexing. For example, if 'myset' is defined
-    by the following GAMS code::
-
-      set myset / abc, def, ghi /;
-
-    then it will be accessible as:
-
-    >>> myset = File('example.gdx').myset
-    >>> myset[2]
-    'ghi'
-    >>> myset[:]
-    ['abc', 'def', 'ghi']
-
-    Note that because Python uses 0-based indexing, indices will be one lower
-    than those used with the GAMS ord() function.
-    """
-    def _load(self):
-        """Implementation of Symbol._load()."""
-        # don't load twice
-        if self._loaded:
-            return
-        elements = []
-        self.unordered = [set() for i in range(self.dim)]
-        records = self._api.data_read_str_start(self._index)
-        for i in range(records):
-            indices, value, afdim = self._api.data_read_str()
-            if self.dim == 1:
-                elements.append(indices[0])
-                self.unordered[0].add(indices[0])
-            else:
-                elements.append(tuple(indices))
-                for j in range(self.dim):
-                    self.unordered[j].add(indices[j])
-        # TODO possibly change this once Set objects are writeable
-        self.elements = tuple(elements)
-        self._loaded = True
-
-    def domain_sets(self):
-        """Implementation of Symbol.domain_sets()."""
-        return self.unordered
-
-    def __getitem__(self, key):
-        """Set element access."""
-        return self.elements[key]
-
-    def __iter__(self):
-        """TODO check behaviour with multidimensional sets"""
-        return iter(self.elements)
-
-    def __len__(self):
-        """Implementation of __len__"""
-        return len(self.elements)
+    def load(self):
+        Symbol.load(self)
+        if self._index == 0 or self.dim == 1:
+            self.idx = pd.Index(self._elements[0])
+        else:
+            elements = [list(d) for d in self.domain]
+            self.idx = pd.MultiIndex.from_product(elements)
 
     @property
     def depth(self):
@@ -525,16 +379,22 @@ class Set(Symbol):
         To assist :meth:`File._match_domain`, a large value is returned when
         the Set's domain is not available.
         """
-        if self.name == '*':
-            return 0
-        elif hasattr(self, 'domain'):
-            return min([d.depth for d in self.domain]) + 1
-        else:
-            return 1000
+        try:
+            if self.name == '*':
+                return 0
+            return min([d.depth for d in filter(None, self.domain)]) + 1
+        except ValueError:
+            return maxsize
+        except RuntimeError:
+            print(self, self.domain)
+            assert False
 
-    def index(self, key):
-        """Shorthand to get the index of *key* in self.elements."""
-        return self.elements.index(key)
+    # Implementations of special methods:
+    __getattr__ = lambda self, name: getattr(self.idx, name)
+    __getitem__ = lambda self, key: self.idx.__getitem__(key)
+    __iter__ = lambda self: self.idx.__iter__()
+    __len__ = lambda self: self.idx.__len__()
+
 
 class Parameter(Symbol):
     """Representation of a GAMS parameter or variable.
@@ -560,86 +420,17 @@ class Parameter(Symbol):
     subset of data; it will simply fail. Integer indexing is also not
     supported.
     """
-    def _load(self):
-        """Implementation of Symbol._load()."""
-        # don't load twice
-        if self._loaded:
-            return
-        self._data = {}
-        records = self._api.data_read_str_start(self._index)
-        for i in range(records):
-            indices, value, afdim = self._api.data_read_str()
-            if self.dim == 1:
-                indices = indices[0]
-            else:
-                indices = tuple(indices)
-            self._data[indices] = value[gdxcc.GMS_VAL_LEVEL]
-        if self.dim == 0:
-            self.domain = []
-        self._loaded = True
+    def load(self):
+        Symbol.load(self)
+        elements = [list(d) for d in self.domain] if self.dim > 0 else \
+            [tuple()]
+        self.data = pd.Series(self._data, pd.MultiIndex.from_product(elements))
 
-    def domain_sets(self):
-        """Implementation of Symbol.domain_sets()."""
-        result = [set() for i in range(self.dim)]
-        for key in self._data.keys():
-            if self.dim == 1:
-                key = (key,)
-            for i in range(self.dim):
-                result[i].add(key[i])
-        return result
+    def __getattr__(self, name):
+        if name == 'data':
+            self.load()
+            return self.data
 
-    def _enumarray(self):
-        self._value = enumarray(self.domain)
-        for k, v in self._data.items():
-            self._value[k] = v
-
-    def __getitem__(self, key):
-        """Attribute access method.
-
-        TODO: add more indexing features
-        """
-        if not hasattr(self, '_value'):
-            self._enumarray()
-        return self._value[key]
-
-    def __setitem__(self, key, value):
-        if not hasattr(self, '_value'):
-            self._enumarray()
-        self._value[key] = value
-
-#    if type(key) != tuple:
-#      key = (key,)
-#    if len(key) != self.dim:
-#      raise TypeError(key)
-#    elif any([type(k) == slice for k in key]):
-#      # slicing N-dimensional data, N ≥ 1
-#      indices = []
-#      for i, k in enumerate(key):
-#        if type(k) == slice:
-#          indices.append(self.domain[i].elements[k])
-#        else:
-#          indices.append((k,))
-#      if self.dim == 1:
-#        idx = 0
-#      else:
-#        idx = slice(self.dim)
-#      return RETURN([self.value.get(k[idx], NULL) for k in
-#        product(*indices)])
-#    elif key in self.value:
-#      # key directly specifies a single element of the parameter
-#      return self.value[key]
-#    elif self._valid_key(key):
-#      # key is valid, but there's no data
-#      return NULL
-#    else:
-#      # something else went wrong; nothing should be raised here
-#      raise KeyError(key)
-
-#  def _valid_key(self, key):
-#    """Check that all elements of a __getitem__() key are in the domain."""
-#    if self.dim == 0:
-#      return False
-#    return all([(key[i] in self.domain[i].elements) for i in range(self.dim)])
 
 # GAMS variables are currently functionally equivalent to parameters
 Variable = Parameter
