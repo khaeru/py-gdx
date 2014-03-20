@@ -12,16 +12,10 @@ TODO: document
 """
 from os.path import dirname
 from subprocess import check_output
-import sys
-if sys.version_info[0] >= 3:
-    from queue import Queue
-else:
-    from Queue import Queue
 from sys import maxsize
 
 import pandas as pd
 
-from .enumarray import enumarray
 import gdxcc
 
 
@@ -115,7 +109,7 @@ class GDX:
         else:
             error_str = self.call('ErrorStr', ret[1])
             if method == 'OpenRead' and (error_str ==
-                    'No such file or directory'):
+                                         'No such file or directory'):
                 raise FileNotFoundError("[gdx{}] {}: '{}'".format(method,
                                                                   error_str,
                                                                   args[0]))
@@ -139,9 +133,7 @@ class GDX:
         TODO: extend for Windows, Mac.
         """
         try:
-            result = dirname(check_output(['which', 'gams']))
-            if sys.version_info[0] >= 3:
-                result = result.decode()
+            result = dirname(check_output(['which', 'gams'])).decode()
             return result
         except OSError:
             return ''
@@ -178,7 +170,6 @@ class File:
         # read symbols
         self._symbols = {}
         self._index = [None for _ in range(self.symbol_count + 1)]
-        set_queue = Queue()
         for symbol_num in range(self.symbol_count + 1):
             name, _, type_code = self._api.symbol_info(symbol_num)
             name = name.lower()
@@ -200,12 +191,12 @@ class File:
     def sets(self):
         """Return a list of all Set objects."""
         return list(filter(lambda s: isinstance(s, Set) and s.name != '*',
-                    self._symbols.values()))
+                           self._symbols.values()))
 
     def parameters(self):
         """Return a list of all Parameter objects."""
         return list(filter(lambda s: isinstance(s, Parameter),
-            self._symbols.values()))
+                           self._symbols.values()))
 
     def get_symbol(self, name):
         """Retrieve the GAMS symbol *name*."""
@@ -275,7 +266,7 @@ class Symbol:
             return
         else:
             self.load()
-    
+
     def load(self):
         if self._loaded:
             return
@@ -295,7 +286,6 @@ class Symbol:
         if self._index == 0:
             self._loaded = True
             return
-        parent_elements = [list() for _ in range(self.dim)]
         if self._domain_index is not None:
             # Some domain is specified for this Set
             for i, d in enumerate(self._domain_index):
@@ -312,9 +302,9 @@ class Symbol:
                     continue
                 # There is a bit of ambiguity here: could prefer the
                 # highest-level non-* set, or the lowest level.
-                elif set(s.idx).issuperset(self._elements[i]) and (len(s) <
-                    len(candidate)) and s.depth < getattr(candidate,
-                        'depth', maxsize):
+                elif (set(s.idx).issuperset(self._elements[i]) and len(s) <
+                      len(candidate) and s.depth < getattr(candidate, 'depth',
+                                                           maxsize)):
                     candidate = s
             if isinstance(candidate, Set):
                 self.domain[i] = candidate

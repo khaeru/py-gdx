@@ -1,8 +1,6 @@
 from collections import OrderedDict
 from unittest import TestCase
 
-import numpy as np
-
 import gdx
 
 
@@ -10,28 +8,24 @@ URI = 'data/tests.gdx'
 
 
 actual = OrderedDict([
-  ('*', None),
-  ('s', ['a', 'b', 'c', 'd', 'e', 'f', 'g']),
-  ('t', ['r', 'o', 'y', 'g', 'b', 'i', 'v']),
-  ('u', ['CA', 'US', 'CN', 'JP']),
-  ('s1', ['a', 'b', 'c', 'd']),
-  ('s2', ['e', 'f', 'g']),
-  ('s3', None),
-  ('s4', None),
-  ('s5', ['b', 'd', 'f']),
-  ('s6', ['b', 'd', 'f']),
-  ('p1', None),
-  ('p2', None),
-  ('p3', None),
-  ])
+    ('*', None),
+    ('s', ['a', 'b', 'c', 'd', 'e', 'f', 'g']),
+    ('t', ['r', 'o', 'y', 'g', 'b', 'i', 'v']),
+    ('u', ['CA', 'US', 'CN', 'JP']),
+    ('s1', ['a', 'b', 'c', 'd']),
+    ('s2', ['e', 'f', 'g']),
+    ('s3', None),
+    ('s4', None),
+    ('s5', ['b', 'd', 'f']),
+    ('s6', ['b', 'd', 'f']),
+    ('p1', None),
+    ('p2', None),
+    ('p3', None),
+    ])
 actual_info = {
-  'N sets': 9,
-  'N parameters': 3,
-  }
-
-
-def test_import():
-    import gdx as gdx_
+    'N sets': 9,
+    'N parameters': 3,
+    }
 
 
 class TestGDX:
@@ -41,9 +35,9 @@ class TestGDX:
 
 class TestFile(TestCase):
     def test_init(self):
-        f = gdx.File(URI)
+        gdx.File(URI)
         with self.assertRaises(FileNotFoundError):
-            f = gdx.File('nonexistent.gdx')
+            gdx.File('nonexistent.gdx')
 
     def test_parameters(self):
         f = gdx.File(URI)
@@ -74,16 +68,16 @@ class TestFile(TestCase):
     def test_getattr(self):
         f = gdx.File(URI)
         for name in actual.keys():
-            sym = getattr(f, name)
+            getattr(f, name)
         with self.assertRaises(AttributeError):
-            sym = f.notasymbolname
+            f.notasymbolname
 
     def test_getitem(self):
         f = gdx.File(URI)
         for name in actual.keys():
-            sym = f[name]
+            f[name]
         with self.assertRaises(KeyError):
-            sym = f['notasymbolname']
+            f['notasymbolname']
 
 
 class TestSymbol:
@@ -108,9 +102,9 @@ class TestSet(TestCase):
 
     def test_getitem(self):
         for i in range(len(self.file.s)):
-            elem = self.file.s[i]
+            self.file.s[i]
         with self.assertRaises(IndexError):
-            elem = self.file.s[i + 1]
+            self.file.s[i + 1]
 
     def test_index(self):
         assert self.file.s.get_loc('d') == 3
@@ -135,7 +129,7 @@ class TestParameter:
         self.file = gdx.File(URI)
 
     def test_example(self):
-        p1 = self.file.p1
+        self.file.p1
 
 
 class TestEquation:
