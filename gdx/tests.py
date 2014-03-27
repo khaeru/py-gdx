@@ -113,7 +113,7 @@ class TestSet(TestCase):
         for i, elem in enumerate(self.file.s):
             assert actual['s'][i] == elem
 
-    def test_pandas(self):
+    def test_domain(self):
         assert self.file.s.domain == [self.star]
         assert self.file.t.domain == [self.star]
         assert self.file.u.domain == [self.star]
