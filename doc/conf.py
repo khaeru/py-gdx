@@ -25,7 +25,12 @@ sys.path.insert(0, os.path.abspath('../'))
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
-extensions = ['sphinx.ext.autodoc', 'sphinx.ext.todo', 'sphinx.ext.coverage']
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.intersphinx',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    ]
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -41,7 +46,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'GDX-Python'
-copyright = u'2012, Paul Natsuo Kishimoto'
+copyright = u'2012–2014, Paul Natsuo Kishimoto'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -240,3 +245,11 @@ texinfo_documents = [
 
 # How to display URL addresses: 'footnote', 'no', or 'inline'.
 #texinfo_show_urls = 'footnote'
+
+# -- Options for extensions ----------------------------------------------------
+intersphinx_mapping = {
+  'python': ('http://docs.python.org/3', None),
+  'pandas': ('http://pandas.pydata.org/pandas-docs/stable/', None),
+  }
+
+todo_include_todos = True

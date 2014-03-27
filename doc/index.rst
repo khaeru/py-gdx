@@ -8,10 +8,14 @@ Welcome to GDX-Python's documentation!
 
 Contents:
 
-.. automodule:: gdx
-   :members: File, Symbol, Set, Parameter, Variable, GDX
-   :private-members:
-   :special-members:
+.. toctree::
+   :maxdepth: 2
+   
+   install
+   tutorial
+   reference
+   todos
+   license
 
 .. Indices and tables
    ==================
