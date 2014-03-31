@@ -533,12 +533,16 @@ class Parameter(Symbol):
         """Load Parameter data."""
         # Populate _elements and data for following code
         Symbol._load(self)
-        # Elements for a pandas MultiIndex for this set.
-        # pd.MultiIndex.from_product will produce a pd.Index if the length of
-        # the argument is 1 (i.e. if self.dim == 1)
-        elements = [list(d) for d in self.domain] if self.dim > 0 else \
-            [tuple()]
-        self.data = pd.Series(self._data, pd.MultiIndex.from_product(elements))
+        if self.dim == 0:
+            self.data = self._data[tuple()]
+        else:
+            # Elements for a pandas MultiIndex for this set.
+            # pd.MultiIndex.from_product will produce a pd.Index if the length
+            # of the argument is 1 (i.e. if self.dim == 1)
+            elements = [list(d) for d in self.domain] if self.dim > 0 else \
+                [tuple()]
+            self.data = pd.Series(self._data, pd.MultiIndex.from_product(
+                                                                     elements))
         self._loaded = True
 
     def __getattr__(self, name):
