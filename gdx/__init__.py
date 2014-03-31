@@ -550,8 +550,8 @@ class Parameter(Symbol):
             self._load()
             return self.data
 
-    # Implementations of special methods: direct access to the pandas data
-    # structure
+    # Implementations of special methods:
+    # Direct access to the pandas data structure
     __getattr__ = lambda self, name: getattr(self.data, name)
     __iter__ = lambda self: self.data.__iter__()
     __len__ = lambda self: self.data.__len__()
@@ -567,6 +567,40 @@ class Parameter(Symbol):
         else:
             key_ = key
         return self.data.ix[key_]
+
+    # Methods for 0-dimensional Parameters (i.e. scalars)
+    def __float__(self):
+        if self.dim > 0:
+            raise ValueError(('Cannot convert {}-dimensional Parameter to '
+                              'float').format(self.dim))
+        return self.data
+
+    # More numeric methods based on __float__
+    __int__ = lambda self: int(float(self))
+    __lt__ = lambda self, other: float(self).__lt__(other)
+    __le__ = lambda self, other: float(self).__le__(other)
+    __gt__ = lambda self, other: float(self).__gt__(other)
+    __ge__ = lambda self, other: float(self).__ge__(other)
+
+    def __eq__(self, other):
+        """Implementation of __eq__.
+
+        * Compare using __float__ when it has meaning and the other object is
+          numeric.
+        * Compare as identity with another Symbol or None.
+        """
+        if self.dim == 0 and isinstance(other, (int, float, complex)):
+            return float(self).__eq__(other)
+        elif isinstance(other, Symbol):
+            return self._index == other._index
+        elif other is None:
+            return False
+        else:
+            raise NotImplementedError(('Cannot compare Parameter with '
+                                       '{}.').format(type(other)))
+
+    # Inequality: inverse of __eq__
+    __ne__ = lambda self, other: not self.__eq__(other)
 
 
 # GAMS variables are currently functionally equivalent to parameters
