@@ -541,8 +541,10 @@ class Parameter(Symbol):
             # of the argument is 1 (i.e. if self.dim == 1)
             elements = [list(d) for d in self.domain] if self.dim > 0 else \
                 [tuple()]
+            names = [d.name for d in self.domain] if self.dim > 0 else [
+                                                                       tuple()]
             self.data = pd.Series(self._data, pd.MultiIndex.from_product(
-                                                                     elements))
+                                  elements, names=names))
         self._loaded = True
 
     def __getattr__(self, name):
