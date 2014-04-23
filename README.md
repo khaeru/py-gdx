@@ -1,11 +1,11 @@
-# py-gdx
+# PyGDX
 
-py-gdx is a Python 3 package for accessing data stored in GDX-formatted files, through the Python bindings for the [GAMS](http://www.gams.com) [GDX API](http://www.gams.com/dd/docs/api/expert-level/gdxqdrep.html).
+PyGDX is a Python 3 package for accessing data stored in GDX-formatted files, through the Python bindings for the [GAMS](http://www.gams.com) [GDX API](http://www.gams.com/dd/docs/api/expert-level/gdxqdrep.html). Inspired by the similar package, also named [py-gdx, by Geoff
+Leyland](https://github.com/geoffleyland/py-gdx), this version makes use of [pandas](http://pandas.pydata.org/) to provide labelled data structures which can be easily manipulated with [NumPy](http://www.numpy.org/) for calculations and plotting.
 
-Originally inspired by the similar package, also called py-gdx, by Geoff
-Leyland (https://github.com/geoffleyland/py-gdx), this version makes use of [pandas](http://pandas.pydata.org/) to provide Pythonic data structures for access to GAMS data, which can be easily intergrated into [NumPy](http://www.numpy.org/)-based code.
+**Documentation** is available at http://pygdx.readthedocs.org/, built automatically from the contents of the Github repository.
 
-Documentation is available at http://khaeru.github.io/py-gdx/
+PyGDX is provided under the **MIT License** (see `LICENSE`).
 
 Example
 -------
@@ -14,7 +14,7 @@ With the following GAMS program:
 ````
 set  s  'Animals'  /
   a  Aardvark
-  b  'Blue whale'
+  b  Blue whale
   c  Chicken
   d  Dingo
   e  Elephant
@@ -49,7 +49,7 @@ The parameter `p` can be accessed via:
 ````python
 >>> import gdx
 >>> f = gdx.File('example.gdx')
->>> f.p[:,'y',CA']
+>>> f.p[:,'y','CA']
 a    1
 b    1
 c    1
