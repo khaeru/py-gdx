@@ -24,7 +24,7 @@ from xray import DataArray, Dataset
 import gdxcc
 
 
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 # 'from gdx import *' will only bring these items into the namespace.
 __all__ = [
@@ -134,7 +134,6 @@ class GDX:
                     raise FileNotFoundError("[gdx{}] {}: '{}'".format(method,
                                             error_str, args[0]))
             else:
-#                assert False, method
                 error_count = self.call('ErrorCount')
                 if error_count > self.error_count:
                     self.error_count = error_count
@@ -196,44 +195,54 @@ class File(Dataset):
     def __init__(self, filename='', mode='r'):
         """Constructor."""
         Dataset.__init__(self)
+
         # load the GDX API
         self._api = GDX()
-        api = self._api
-        api.open_read(filename)
-        v, p = api.file_version()
-        sc, ec = api.system_info()
+        self._api.open_read(filename)
+
+        v, p = self._api.file_version()
+        sc, ec = self._api.system_info()
         self.attrs['version'] = v.strip()
         self.attrs['producer'] = p.strip()
         self.attrs['symbol_count'] = sc
         self.attrs['element_count'] = ec
+
         self._symbols = {}
+        self._alias = {}
         self._index = [None for _ in range(sc + 1)]
-        self._scalar = {}
+
         # Read symbols
         [self._load_symbol(s_num) for s_num in range(sc + 1)]
 
     def _load_symbol(self, index):
         if self._index[index] in self._symbols:
-            debug('_load_symbol({}): already loaded'.format(index))
             return
-        api = self._api
 
         # Read information about the symbol
-        name, dim, type_code = api.symbol_info(index)
-        n_records, vartype, desc = api.symbol_info_x(index)
-        debug('symbol_info({}): {} — {}-dim — {}'.format(index,
-                                                          name, dim, type_str[type_code]))
-        debug('symbol_info_x({}): {} — {} — {}'.format(index,
-                                                      n_records, vartype, desc))
+        name, dim, type_code = self._api.symbol_info(index)
+        n_records, vartype, desc = self._api.symbol_info_x(index)
+        self._index[index] = name
+        attrs = {
+          'index': index,
+          'name': name,
+          'dim': dim,
+          'type_code': type_code,
+          'records': n_records,
+          'vartype': vartype,
+          'description': desc,
+          }
 
         # Equations and aliases require limited processing
         if type_code == gdxcc.GMS_DT_EQU:
-            debug('{}: loading of GMS_DT_EQU not implemented'.format(name))
+            #debug('{}: loading of GMS_DT_EQU not implemented'.format(name))
             return
         elif type_code == gdxcc.GMS_DT_ALIAS:
             parent = self[desc.replace('Aliased with ', '')]
+            self._alias[name] = parent.name
             if parent.attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET:
-                Dataset.__setitem__(self, name, parent.copy())
+                new_var = parent.copy()
+                new_var.name = name
+                Dataset.merge(self, {name: new_var}, inplace=True)
                 Dataset.set_coords(self, name, inplace=True)
             else:
                 # TODO fix this
@@ -251,10 +260,11 @@ class File(Dataset):
 
         # Read the domain of the set, as a list of names
         try:
-            domain = api.symbol_get_domain_x(index)
+            domain = self._api.symbol_get_domain_x(index)
         except Exception as e:
             assert name == '*'
             domain = []
+        attrs['domain'] = domain
 
         # Read the elements of the domain directly.
         n_records2 = self._api.data_read_str_start(index)
@@ -287,102 +297,91 @@ class File(Dataset):
                 raise
 
         # Domain as a list of references
-        domain_ = [None for _ in range(dim)]
+        domain_ = [None for _ in range(dim)] if index > 0 else []
         # If domain is specified for the symbol, try to use that information
         for i, d in enumerate(domain):
-            if d != '*':
-                domain_[i] = self[d]
+            domain_[i] = self[d]
+            if d != '*' or len(elements[i]) == 0:
                 assert set(domain_[i].values).issuperset(elements[i])
                 continue
             # Compute the domain directly for this dimension
-            candidate = self[d]
+            #debug('{} dim {} matching "{}"…'.format(name, i, d))
             for s in self.coords.values():
-                print(s.name)
-                if s.ndim > 1 or s.name == name or (s.attrs['_gdx_domain'] ==
-                                                                        [self]):
-                    # s doesn't work as as a domain for this dimension:
-                    # multidimensional, same Set, or it has the current Set as
-                    # its domain (recursion)
-                    continue
-                elif (set(s.values).issuperset(elements[i]) and
-                      len(s) < len(candidate) and
-                      s.attrs['_gdx_index'] < candidate.attrs['_gdx_index']):
-                    # s is a better match than candidate for the domain: it is a
-                    # superset of the elements on this dimension, is smaller,
-                    # and is at a low 'depth' (closer to '*').
-                    debug('{} dim {} ("{}"): prefer {} to {}'.format(name, i, d, s.name, candidate.name))
-                    candidate = s
-            # Best candidate is this Symbol's domain for the current
-            # dimension
-            domain_[i] = candidate
-        if len(domain):
-            debug('{} {}'.format(domain, list([d.name for d in domain_])))
-        # TODO domain_ doesn't yet actually DO anything
+                if s.ndim == 1 and set(s.values).issuperset(elements[i]) and \
+                        len(s) < len(domain_[i]):
+                    domain_[i] = s
+
+        domain = [d.name for d in domain_]
+        attrs['domain_inferred'] = domain
 
         # Continue loading
-        if type_code == gdxcc.GMS_DT_SET:
-            if dim > 1:
-                Dataset.__setitem__(self, name, self._to_dataarray(domain,
-                                                                   elements, data,
-                                                                   'set'))
-            else:
-                Dataset.__setitem__(self, name, elements[0])
-            Dataset.set_coords(self, name, inplace=True)
-        elif type_code in (gdxcc.GMS_DT_PAR, gdxcc.GMS_DT_VAR):
-            if dim == 0:
-                self._scalar[name] = data.popitem()
-                return
-            else:
-                try:
-                    temp = self._to_dataarray(domain, elements, data)
-                    Dataset.__setitem__(self, name, temp)
-                except ValueError:
-                    print(temp, '\n\n', self, '\n\n', self['*'].values)
-                    raise
-        # TODO these are not saved for scalars
-        self[name].attrs['_gdx_domain'] = domain
-        self[name].attrs['_gdx_index'] = index
-        self[name].attrs['_gdx_type_code'] = type_code
+        if dim == 0:
+            new_var = data.popitem()
+        elif type_code == gdxcc.GMS_DT_SET and dim == 1:
+            new_var = elements[0]
+        else:
+            new_var = self._to_dataarray(domain, elements, data, type_code)
 
-    def _to_dataarray(self, domain, elements, data, mode='parameter'):
-        assert mode in ('set', 'parameter')
+        Dataset.merge(self, {name: new_var}, inplace=True, join='left')
+
+        if type_code == gdxcc.GMS_DT_SET:
+            Dataset.set_coords(self, name, inplace=True)
+
+        for k, v in attrs.items():
+            self[name].attrs['_gdx_{}'.format(k)] = v
+
+    def _to_dataarray(self, domain, elements, data, type_code):
+        assert type_code in (gdxcc.GMS_DT_PAR, gdxcc.GMS_DT_SET,
+                             gdxcc.GMS_DT_VAR)
+        extra_keys = []
+        kwargs = {}
+        fill = nan
+
         # To satisfy xray.DataArray.__init__, two dimensions must not have the
         # same name unless they have the same length. Construct a 'fake'
         # universal set.
-        if sum(map(lambda d: d=='*', domain)) > 1:
+        pseudo = sum(map(lambda d: d=='*', domain)) > 1
+        if pseudo:
             dim = range(len(domain))
             star = set(chain(*[elements[i] for i in dim if domain[i] == '*' and
                                 len(elements[i])]))
             elements = [star if domain[i] == '*' else elements[i] for i in dim]
-        kwargs = {}
-        fill = nan
-        if mode == 'set':
+            extra_tuples = [tuple([e if domain[i] == '*' else elements[i][0] for
+                                   i in dim]) for e in star]
+
+        if type_code == gdxcc.GMS_DT_SET:
             data = dict(zip_longest(data.keys(), [True], fillvalue=True))
             fill = False
             kwargs['dtype'] = bool
-        # Dummy data
+
         if len(data) == 0:
+            # Dummy data
             key = tuple([self[d].values[0] for d in domain])
             data[key] = fill
+
         # Construct the index
         if len(domain) == 1:
             idx = Index(data.keys(), name=domain[0])
         elif len(data) == 1:
             idx = MultiIndex.from_tuples([data.keys()], names=domain)
         else:
-            idx = MultiIndex.from_tuples(data.keys(), names=domain)
+            tuples = data.keys()
+            if pseudo:
+                tuples = list(chain(tuples, extra_tuples))
+            idx = MultiIndex.from_tuples(tuples, names=domain)
+
         return DataArray.from_series(Series(data, index=idx, **kwargs))
 
-    # def sets(self):
-    #     """Return a list of all :class:`Set` objects in this :class:`File`."""
-    #     return list(filter(lambda s: isinstance(s, Set) and s.name != '*',
-    #                        self._symbols.values()))
-    #
-    # def parameters(self):
-    #     """Return a list of all :class:`Parameter` objects in this
-    #     :class:`File`."""
-    #     return list(filter(lambda s: isinstance(s, Parameter),
-    #                        self._symbols.values()))
+    def _dealias(self, name):
+        return self[self._alias[name]] if name in self._alias else self[name]
+
+    def sets(self):
+        """Return a list of all GDX sets"""
+        return list(filter(lambda s: s.attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET, self._variables.values()))
+
+    def parameters(self):
+        """Return a list of all GDX parameters"""
+        return list(filter(lambda s: s.attrs['_gdx_type_code'] == gdxcc.GMS_DT_PAR, self._variables.values()))
 
     def get_symbol_by_index(self, index):
         """Retrieve the :class:`Symbol` stored at the *index*-th position in
