@@ -11,8 +11,6 @@
 """
 from collections import OrderedDict
 from itertools import chain, zip_longest
-import logging
-from logging import debug
 from os.path import dirname
 from subprocess import check_output
 from sys import exit, maxsize
@@ -23,7 +21,8 @@ from xray import DataArray, Dataset
 
 import gdxcc
 
-
+#import logging
+#from logging import debug
 #logging.basicConfig(level=logging.DEBUG)
 
 # 'from gdx import *' will only bring these items into the namespace.
@@ -234,7 +233,8 @@ class File(Dataset):
 
         # Equations and aliases require limited processing
         if type_code == gdxcc.GMS_DT_EQU:
-            #debug('{}: loading of GMS_DT_EQU not implemented'.format(name))
+            raise RuntimeWarning('Loading of GMS_DT_EQU not implemented: '
+                ' {} {} not loaded.'.format(index, name))
             return
         elif type_code == gdxcc.GMS_DT_ALIAS:
             parent = self[desc.replace('Aliased with ', '')]
@@ -245,9 +245,8 @@ class File(Dataset):
                 Dataset.merge(self, {name: new_var}, inplace=True)
                 Dataset.set_coords(self, name, inplace=True)
             else:
-                # TODO fix this
-                assert False
-                self._alias[name] = parent
+                raise NotImplementedError('Cannot handle aliases of symbols '
+                    'except GMS_DT_SET: {} {} not loaded'.format(index, name))
             return
 
         # Common code for sets, parameters and variables
@@ -305,7 +304,6 @@ class File(Dataset):
                 assert set(domain_[i].values).issuperset(elements[i])
                 continue
             # Compute the domain directly for this dimension
-            #debug('{} dim {} matching "{}"…'.format(name, i, d))
             for s in self.coords.values():
                 if s.ndim == 1 and set(s.values).issuperset(elements[i]) and \
                         len(s) < len(domain_[i]):
