@@ -11,9 +11,7 @@
 """
 from collections import OrderedDict
 from itertools import chain, zip_longest
-from os.path import dirname
-from subprocess import check_output
-from sys import exit, maxsize
+from sys import maxsize
 
 from numpy import full, nan
 from pandas import Index, MultiIndex, Series
@@ -21,155 +19,17 @@ from xray import DataArray, Dataset
 
 import gdxcc
 
-#import logging
-#from logging import debug
-#logging.basicConfig(level=logging.DEBUG)
+from .api import type_str, vartype_str, GDX
 
-# 'from gdx import *' will only bring these items into the namespace.
+# commented: for debugging
+import logging
+from logging import debug, warn
+logging.basicConfig(level=logging.WARNING)
+
+
 __all__ = [
     'File',
-    'GDX',
-    #'Symbol',    # commented: only reading supported at the moment. Creating
-    #'Equation',  # these will make sense once writing is supported
-    #'Set',
-    #'Parameter',
-    #'Variable',
-    'type_str',
     ]
-
-#: String representations of API constants for G(a)MS D(ata) T(ypes)
-type_str = {
-    gdxcc.GMS_DT_SET: 'set',
-    gdxcc.GMS_DT_PAR: 'parameter',
-    gdxcc.GMS_DT_VAR: 'variable',
-    gdxcc.GMS_DT_EQU: 'equation',
-    gdxcc.GMS_DT_ALIAS: 'alias',  # aliases not created; see File.__init__()
-    }
-
-#: String representations of API constants for G(a)MS VAR(iable) TYPE(s)
-vartype_str = {
-    gdxcc.GMS_VARTYPE_UNKNOWN: 'unknown',
-    gdxcc.GMS_VARTYPE_BINARY: 'binary',
-    gdxcc.GMS_VARTYPE_INTEGER: 'integer',
-    gdxcc.GMS_VARTYPE_POSITIVE: 'positive',
-    gdxcc.GMS_VARTYPE_NEGATIVE: 'negative',
-    gdxcc.GMS_VARTYPE_FREE: 'free',
-    gdxcc.GMS_VARTYPE_SOS1: 'sos1',
-    gdxcc.GMS_VARTYPE_SOS2: 'sos2',
-    gdxcc.GMS_VARTYPE_SEMICONT: 'semicont',
-    gdxcc.GMS_VARTYPE_SEMIINT: 'semiint',
-    gdxcc.GMS_VARTYPE_MAX: 'max',
-    }
-
-
-class GDX:
-    """Basic wrapper around the GDX API.
-
-    Most methods in the GDX API have similar semantics:
-
-    * All method names begin with `gdx`.
-    * Most methods return a list where the first element is a return code.
-
-    This class hides these details, allowing for simpler code. Methods can be
-    accessed using :func:`call`:
-
-    >>> g = GDX()
-    >>> g.call('FileVersion') # call gdxFileVersion()
-
-    Alternately, they can be accessed as "Pythonic" members of GDX objects,
-    where CamelCase is replaced by lowercase, with underscores separating
-    words.
-
-    >>> g.file_version()      # same as above
-
-    """
-    #: Methods that conform to the semantics of :func:`call`
-    __valid = [
-        'CreateD',
-        'DataReadStr',
-        'DataReadStrStart',
-        'ErrorCount',
-        'ErrorStr',
-        'FileVersion',
-        'GetElemText',
-        'GetLastError',
-        'OpenRead',
-        'SymbolGetDomain',
-        'SymbolGetDomainX',
-        'SymbolInfo',
-        'SymbolInfoX',
-        'SystemInfo',
-        ]
-
-    def __init__(self):
-        """Constructor."""
-        self._handle = gdxcc.new_gdxHandle_tp()
-        self.error_count = 0
-        self.call('CreateD', GDX._gams_dir(), gdxcc.GMS_SSSIZE)
-
-    def call(self, method, *args):
-        """Invoke the GDX API method named gdx*method*.
-
-        Optional positional arguments *args* are passed to the API method.
-        Returns the result of the method call, or raises an appropriate
-        exception.
-        """
-        if method not in self.__valid:
-            raise NotImplementedError(('GDX.call() cannot invoke '
-                                       'gdxcc.gdx{}').format(method))
-        ret = getattr(gdxcc, 'gdx{}'.format(method))(self._handle, *args)
-        if isinstance(ret, int):
-            return ret
-        if ret[0]:
-            # unwrap a 1-element array
-            if len(ret) == 2:
-                return ret[1]
-            else:
-                return ret[1:]
-        else:
-            if method == 'OpenRead':
-                error_str = self.call('ErrorStr', ret[1])
-                if error_str == 'No such file or directory':
-                    raise FileNotFoundError("[gdx{}] {}: '{}'".format(method,
-                                            error_str, args[0]))
-            else:
-                error_count = self.call('ErrorCount')
-                if error_count > self.error_count:
-                    self.error_count = error_count
-                    error_num = self.call('GetLastError')
-                    error_str = self.call('ErrorStr', error_num)
-                    raise Exception('[gdx{}] {}'.format(method, error_str))
-                else:
-                    raise RuntimeError(('[gdx{}] returned {} for arguments {}'
-                                        ).format(method, args, ret))
-
-    def __getattr__(self, name):
-        """Name mangling for method invocation without call()."""
-        mangle = name.title().replace('_', '')
-        if mangle in self.__valid:
-            def wrapper(*args):
-                return self.call(mangle, *args)
-            return wrapper
-        else:
-            raise AttributeError(name)
-
-    @staticmethod
-    def _gams_dir():
-        """Locate GAMS on a POSIX system.
-
-        The path to the GAMS executable is a required argument of
-        ``gdxCreateD``, the method for connecting to the GDX API.
-
-        .. todo::
-
-           This function relies on the shell utility `which`, and will probably
-           not work on Windows. Extend.
-        """
-        try:
-            result = dirname(check_output(['which', 'gams'])).decode()
-            return result
-        except OSError:
-            return ''
 
 
 class File(Dataset):
@@ -191,7 +51,7 @@ class File(Dataset):
        >>> f.myparam.description
        'Example GAMS parameter'
     """
-    def __init__(self, filename='', mode='r'):
+    def __init__(self, filename='', skip=set(), mode='r', lazy=True):
         """Constructor."""
         Dataset.__init__(self)
 
@@ -206,17 +66,17 @@ class File(Dataset):
         self.attrs['symbol_count'] = sc
         self.attrs['element_count'] = ec
 
-        self._symbols = {}
-        self._alias = {}
         self._index = [None for _ in range(sc + 1)]
+        self._to_skip = skip
+        self._skipped = []
+        self._state = {}
+        self._alias = {}
 
         # Read symbols
-        [self._load_symbol(s_num) for s_num in range(sc + 1)]
+        for s_num in range(sc + 1):
+            self._load_symbol(s_num, lazy)
 
-    def _load_symbol(self, index):
-        if self._index[index] in self._symbols:
-            return
-
+    def _load_symbol(self, index, lazy=True):
         # Read information about the symbol
         name, dim, type_code = self._api.symbol_info(index)
         n_records, vartype, desc = self._api.symbol_info_x(index)
@@ -230,11 +90,26 @@ class File(Dataset):
           'vartype': vartype,
           'description': desc,
           }
+        # Common code for sets, parameters and variables
+        # Set the type
+        type_str_ = type_str[type_code]
+        if type_code == gdxcc.GMS_DT_PAR and dim == 0:
+            type_str_ = 'scalar'
+        try:
+            vartype_str_ = vartype_str[vartype]
+        except KeyError:
+            vartype_str_ = ''
+        attrs['type_str'] = '{} {}'.format(vartype_str_, type_str_)
+
+        if name in self._to_skip:
+            debug('Skipping {} as directed.'.format(name))
+            return
+        debug('Loading {name}: {dim}-D, {records} records, "{description}"'.format(**attrs))
 
         # Equations and aliases require limited processing
         if type_code == gdxcc.GMS_DT_EQU:
-            raise RuntimeWarning('Loading of GMS_DT_EQU not implemented: '
-                ' {} {} not loaded.'.format(index, name))
+            warn('Loading of GMS_DT_EQU not implemented: {} {} not loaded.'.
+                 format(index, name))
             return
         elif type_code == gdxcc.GMS_DT_ALIAS:
             parent = self[desc.replace('Aliased with ', '')]
@@ -248,14 +123,6 @@ class File(Dataset):
                 raise NotImplementedError('Cannot handle aliases of symbols '
                     'except GMS_DT_SET: {} {} not loaded'.format(index, name))
             return
-
-        # Common code for sets, parameters and variables
-        # Set the type
-        gdx_type = type_str[type_code]
-        if gdx_type == 'parameter':
-            if dim == 0:
-                gdx_type = 'scalar'
-            gdx_type = '{} {}'.format(vartype_str[vartype], gdx_type)
 
         # Read the domain of the set, as a list of names
         try:
@@ -311,26 +178,53 @@ class File(Dataset):
 
         domain = [d.name for d in domain_]
         attrs['domain_inferred'] = domain
+        debug('domain: {}'.format(domain))
+
+        self._state[name] = {
+            'attrs': attrs,
+            'data': data,
+            'domain': domain,
+            'elements': elements,
+            }
+
+        if type_code == gdxcc.GMS_DT_SET or not lazy:
+            self._add_symbol(name)
+
+    def _add_symbol(self, name):
+        attrs = self._state[name]['attrs']
+        dim = self._state[name]['attrs']['dim']
+        data = self._state[name]['data']
+        domain = self._state[name]['domain']
+        elements = self._state[name]['elements']
 
         # Continue loading
         if dim == 0:
             new_var = data.popitem()
-        elif type_code == gdxcc.GMS_DT_SET and dim == 1:
+        elif attrs['type_code'] == gdxcc.GMS_DT_SET and dim == 1:
             new_var = elements[0]
         else:
-            new_var = self._to_dataarray(domain, elements, data, type_code)
+            try:
+                new_var = self._to_dataarray(domain, elements, data,
+                                             attrs['type_code'])
+            except MemoryError:
+                self._state[name] = None
+                warn('Skipping {} because of MemoryError'.format(name))
+                return
 
         Dataset.merge(self, {name: new_var}, inplace=True, join='left')
 
-        if type_code == gdxcc.GMS_DT_SET:
+        if attrs['type_code'] == gdxcc.GMS_DT_SET:
             Dataset.set_coords(self, name, inplace=True)
 
         for k, v in attrs.items():
-            self[name].attrs['_gdx_{}'.format(k)] = v
+            self[name].attrs['_gdx_' + k] = v
+
+        self._state[name] = True
 
     def _to_dataarray(self, domain, elements, data, type_code):
         assert type_code in (gdxcc.GMS_DT_PAR, gdxcc.GMS_DT_SET,
                              gdxcc.GMS_DT_VAR)
+
         extra_keys = []
         kwargs = {}
         fill = nan
@@ -370,16 +264,29 @@ class File(Dataset):
 
         return DataArray.from_series(Series(data, index=idx, **kwargs))
 
-    def _dealias(self, name):
+    def dealias(self, name):
         return self[self._alias[name]] if name in self._alias else self[name]
+
+    def _loaded_and_cached(self, type_code):
+        names = set()
+        for name, state in self._state.items():
+            if state == True:
+                tc = self._variables[name].attrs['_gdx_type_code']
+            elif isinstance(state, dict):
+                tc = state['attrs']['type_code']
+            else:
+                continue
+            if tc == type_code:
+                names.add(name)
+        return names
 
     def sets(self):
         """Return a list of all GDX sets"""
-        return list(filter(lambda s: s.attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET, self._variables.values()))
+        return self._loaded_and_cached(gdxcc.GMS_DT_SET)
 
     def parameters(self):
         """Return a list of all GDX parameters"""
-        return list(filter(lambda s: s.attrs['_gdx_type_code'] == gdxcc.GMS_DT_PAR, self._variables.values()))
+        return self._loaded_and_cached(gdxcc.GMS_DT_PAR)
 
     def get_symbol_by_index(self, index):
         """Retrieve the :class:`Symbol` stored at the *index*-th position in
@@ -398,7 +305,8 @@ class File(Dataset):
         try:
             return Dataset.__getitem__(self, key)
         except KeyError as e:
-            if isinstance(key, int):
-                return self.get_symbol_by_index(key)
+            if isinstance(self._state[key], dict):
+                self._add_symbol(key)
+                return Dataset.__getitem__(self, key)
             else:
                 raise
