@@ -57,7 +57,7 @@ class TestFile(TestCase):
 
     def test_get_symbol(self):
         f = gdx.File(URI)
-        s = f['s']
+        f['s']
 
     def test_get_symbol_by_index(self):
         f = gdx.File(URI)

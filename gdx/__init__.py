@@ -1,19 +1,6 @@
-# coding: utf-8
-# GAMS GDX interface
-# 2012-06-18 Paul Natsuo Kishimoto <mail@paul.kishimoto.name>
-"""
-
-.. note::
-   For those reading the code: Using the Python 'set' class makes the code in
-   this module simpler, but unfortunately leads to confusing semantics because
-   the 'Set' is also one of the main types of GAMS symbols. To improve clarity
-   in the comments, capitalized 'Set' is used for the latter.
-"""
-from collections import OrderedDict
 from itertools import chain, zip_longest
-from sys import maxsize
 
-from numpy import full, nan
+from numpy import nan
 from pandas import Index, MultiIndex, Series
 from xray import DataArray, Dataset
 
@@ -22,9 +9,9 @@ import gdxcc
 from .api import type_str, vartype_str, GDX
 
 # commented: for debugging
-import logging
-from logging import debug, warn
-logging.basicConfig(level=logging.WARNING)
+# import logging
+# from logging import debug, warn
+# logging.basicConfig(level=logging.WARNING)
 
 
 __all__ = [
@@ -33,23 +20,12 @@ __all__ = [
 
 
 class File(Dataset):
-    """A GDX file.
+    """Load the file at *filename* into memory.
 
-    Load the file at *filename* into memory. *mode* must be 'r' (writing GDX
-    files is not currently supported). If *lazy* is ``True`` (the default),
-    then the data for any GAMS parameter is not loaded until the parameter is
-    first accessed. For large files, this makes loading significantly faster.
+    *mode* must be 'r' (writing GDX files is not currently supported). If
+    *lazy* is ``True`` (default), then the data for GDX parameters is not
+    loaded until each parameter is first accessed.
 
-    Individual GAMS symbols are available in one of three ways:
-
-    1. Using :func:`get_symbol`.
-    2. Using :func:`get_symbol_by_index`.
-    3. As attributes of the File instance. For example, a GAMS parameter
-       'myparam' can be accessed:
-
-       >>> f = File('example.gdx')
-       >>> f.myparam.description
-       'Example GAMS parameter'
     """
     def __init__(self, filename='', skip=set(), mode='r', lazy=True):
         """Constructor."""
@@ -82,14 +58,14 @@ class File(Dataset):
         n_records, vartype, desc = self._api.symbol_info_x(index)
         self._index[index] = name
         attrs = {
-          'index': index,
-          'name': name,
-          'dim': dim,
-          'type_code': type_code,
-          'records': n_records,
-          'vartype': vartype,
-          'description': desc,
-          }
+            'index': index,
+            'name': name,
+            'dim': dim,
+            'type_code': type_code,
+            'records': n_records,
+            'vartype': vartype,
+            'description': desc,
+            }
         # Common code for sets, parameters and variables
         # Set the type
         type_str_ = type_str[type_code]
@@ -102,14 +78,15 @@ class File(Dataset):
         attrs['type_str'] = '{} {}'.format(vartype_str_, type_str_)
 
         if name in self._to_skip:
-            debug('Skipping {} as directed.'.format(name))
+            # debug('Skipping {} as directed.'.format(name))
             return
-        debug('Loading {name}: {dim}-D, {records} records, "{description}"'.format(**attrs))
+        # debug('Loading {name}: {dim}-D, {records} records, '
+        #       '"{description}"'.format(**attrs))
 
         # Equations and aliases require limited processing
         if type_code == gdxcc.GMS_DT_EQU:
-            warn('Loading of GMS_DT_EQU not implemented: {} {} not loaded.'.
-                 format(index, name))
+            # warn('Loading of GMS_DT_EQU not implemented: {} {} not loaded.'.
+            #      format(index, name))
             return
         elif type_code == gdxcc.GMS_DT_ALIAS:
             parent = self[desc.replace('Aliased with ', '')]
@@ -121,22 +98,23 @@ class File(Dataset):
                 Dataset.set_coords(self, name, inplace=True)
             else:
                 raise NotImplementedError('Cannot handle aliases of symbols '
-                    'except GMS_DT_SET: {} {} not loaded'.format(index, name))
+                                          'except GMS_DT_SET: {} {} not loaded'
+                                          .format(index, name))
             return
 
         # Read the domain of the set, as a list of names
         try:
             domain = self._api.symbol_get_domain_x(index)
-        except Exception as e:
+        except Exception:
             assert name == '*'
             domain = []
         attrs['domain'] = domain
 
         # Read the elements of the domain directly.
         n_records2 = self._api.data_read_str_start(index)
-        assert n_records == n_records2, ('{}: gdxSymbolInfoX ({}) and '
-            'gdxDataReadStrStart ({}) disagree on number of records.'
-            ).format(name, n_records, n_records2)
+        assert n_records == n_records2, \
+            ('{}: gdxSymbolInfoX ({}) and gdxDataReadStrStart ({}) disagree on'
+             ' number of records.').format(name, n_records, n_records2)
 
         # Indices of data records, one list per dimension
         elements = [list() for _ in range(dim)]
@@ -153,17 +131,18 @@ class File(Dataset):
                         elements[j].append(label)
                 # Convert a 1-D index from a tuple to a bare string
                 key = labels[0] if dim == 1 else tuple(labels)
-                # The value is a sequence, containing the level, marginal, lower
-                # & upper bounds, etc. Store only the value (first element).
+                # The value is a sequence, containing the level, marginal,
+                # lower & upper bounds, etc. Store only the value (first
+                # element).
                 data[key] = value[gdxcc.GMS_VAL_LEVEL]
-        except Exception as e:
+        except Exception:
             if len(data) == n_records:
                 pass
             else:
                 raise
 
         # Domain as a list of references
-        domain_ = [None for _ in range(dim)] if index > 0 else []
+        domain_ = [None for _junk in range(dim)] if index > 0 else []
         # If domain is specified for the symbol, try to use that information
         for i, d in enumerate(domain):
             domain_[i] = self[d]
@@ -178,7 +157,7 @@ class File(Dataset):
 
         domain = [d.name for d in domain_]
         attrs['domain_inferred'] = domain
-        debug('domain: {}'.format(domain))
+        # debug('domain: {}'.format(domain))
 
         self._state[name] = {
             'attrs': attrs,
@@ -208,7 +187,7 @@ class File(Dataset):
                                              attrs['type_code'])
             except MemoryError:
                 self._state[name] = None
-                warn('Skipping {} because of MemoryError'.format(name))
+                # warn('Skipping {} because of MemoryError'.format(name))
                 return
 
         Dataset.merge(self, {name: new_var}, inplace=True, join='left')
@@ -225,21 +204,20 @@ class File(Dataset):
         assert type_code in (gdxcc.GMS_DT_PAR, gdxcc.GMS_DT_SET,
                              gdxcc.GMS_DT_VAR)
 
-        extra_keys = []
         kwargs = {}
         fill = nan
 
         # To satisfy xray.DataArray.__init__, two dimensions must not have the
         # same name unless they have the same length. Construct a 'fake'
         # universal set.
-        pseudo = sum(map(lambda d: d=='*', domain)) > 1
+        pseudo = sum(map(lambda d: d == '*', domain)) > 1
         if pseudo:
             dim = range(len(domain))
             star = set(chain(*[elements[i] for i in dim if domain[i] == '*' and
-                                len(elements[i])]))
+                               len(elements[i])]))
             elements = [star if domain[i] == '*' else elements[i] for i in dim]
-            extra_tuples = [tuple([e if domain[i] == '*' else elements[i][0] for
-                                   i in dim]) for e in star]
+            extra_tuples = [tuple([e if domain[i] == '*' else elements[i][0]
+                                   for i in dim]) for e in star]
 
         if type_code == gdxcc.GMS_DT_SET:
             data = dict(zip_longest(data.keys(), [True], fillvalue=True))
@@ -265,12 +243,14 @@ class File(Dataset):
         return DataArray.from_series(Series(data, index=idx, **kwargs))
 
     def dealias(self, name):
+        """Identify the GDX Symbol that *name* refers to, and return the
+        corresponding :class:`xray.DataArray`."""
         return self[self._alias[name]] if name in self._alias else self[name]
 
     def _loaded_and_cached(self, type_code):
         names = set()
         for name, state in self._state.items():
-            if state == True:
+            if state is True:
                 tc = self._variables[name].attrs['_gdx_type_code']
             elif isinstance(state, dict):
                 tc = state['attrs']['type_code']
@@ -281,16 +261,16 @@ class File(Dataset):
         return names
 
     def sets(self):
-        """Return a list of all GDX sets"""
+        """Return a list of all GDX Sets."""
         return self._loaded_and_cached(gdxcc.GMS_DT_SET)
 
     def parameters(self):
-        """Return a list of all GDX parameters"""
+        """Return a list of all GDX Parameters."""
         return self._loaded_and_cached(gdxcc.GMS_DT_PAR)
 
     def get_symbol_by_index(self, index):
-        """Retrieve the :class:`Symbol` stored at the *index*-th position in
-        the :class:`File`."""
+        """Retrieve the GAMS symbol stored at the *index*-th position in the
+        :class:`File`."""
         return self[self._index[index]]
 
     def __getattr__(self, name):
@@ -304,7 +284,7 @@ class File(Dataset):
         """Set element access."""
         try:
             return Dataset.__getitem__(self, key)
-        except KeyError as e:
+        except KeyError:
             if isinstance(self._state[key], dict):
                 self._add_symbol(key)
                 return Dataset.__getitem__(self, key)

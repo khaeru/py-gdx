@@ -4,6 +4,13 @@ from subprocess import check_output
 import gdxcc
 
 
+__all__ = [
+    'GDX',
+    'type_str',
+    'vartype_str',
+    ]
+
+
 #: String representations of API constants for G(a)MS D(ata) T(ypes)
 type_str = {
     gdxcc.GMS_DT_SET: 'set',
@@ -33,7 +40,7 @@ vartype_str = {
 def _gams_dir():
     """Locate GAMS on a POSIX system.
 
-    The path to the GAMS executable is a required argument of
+    Returns the path to the  executable is a required argument of
     ``gdxCreateD``, the method for connecting to the GDX API.
 
     .. todo::
@@ -49,27 +56,8 @@ def _gams_dir():
 
 
 class GDX:
-    """Basic wrapper around the GDX API.
-
-    Most methods in the GDX API have similar semantics:
-
-    * All method names begin with `gdx`.
-    * Most methods return a list where the first element is a return code.
-
-    This class hides these details, allowing for simpler code. Methods can be
-    accessed using :func:`call`:
-
-    >>> g = GDX()
-    >>> g.call('FileVersion') # call gdxFileVersion()
-
-    Alternately, they can be accessed as "Pythonic" members of GDX objects,
-    where CamelCase is replaced by lowercase, with underscores separating
-    words.
-
-    >>> g.file_version()      # same as above
-
-    """
-    #: Methods that conform to the semantics of :func:`call`
+    """Wrapper around the `GDX API`_."""
+    #: Methods that conform to the semantics of :func:`call`.
     __valid = [
         'CreateD',
         'DataReadStr',
@@ -94,11 +82,15 @@ class GDX:
         self.call('CreateD', _gams_dir(), gdxcc.GMS_SSSIZE)
 
     def call(self, method, *args):
-        """Invoke the GDX API method named gdx*method*.
+        """Invoke the GDX API method named gdx\ *Method*.
 
         Optional positional arguments *args* are passed to the API method.
-        Returns the result of the method call, or raises an appropriate
-        exception.
+        Returns the result of the method call, with the return code stripped.
+        Refer to the GDX API documentation for the type and number of arguments
+        and return values for any method.
+
+        If the call fails, raise an appropriate exception.
+
         """
         if method not in self.__valid:
             raise NotImplementedError(('GDX.call() cannot invoke '
