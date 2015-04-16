@@ -75,7 +75,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'GDX-Python'
-copyright = u'2012–2014, Paul Natsuo Kishimoto'
+copyright = u'2012–2015, Paul Natsuo Kishimoto'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -125,7 +125,7 @@ pygments_style = 'sphinx'
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-html_theme = 'default'
+#html_theme = 'default'
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -154,7 +154,7 @@ html_theme = 'default'
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = ['_static']
+#html_static_path = ['_static']
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -279,6 +279,7 @@ texinfo_documents = [
 intersphinx_mapping = {
   'python': ('http://docs.python.org/3', None),
   'pandas': ('http://pandas.pydata.org/pandas-docs/stable/', None),
+  'xray': ('http://xray.readthedocs.org/en/stable/', None),
   }
 
 todo_include_todos = True

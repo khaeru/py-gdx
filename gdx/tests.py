@@ -1,6 +1,7 @@
 from collections import OrderedDict
 from unittest import TestCase
 
+import numpy as np
 import gdx
 
 
@@ -28,6 +29,11 @@ actual_info = {
     }
 
 
+def list_cmp(l1, l2):
+    print(l1, l2)
+    return all([i1 == i2 for i1, i2 in zip(l1, l2)])
+
+
 class TestGDX:
     def test_init(self):
         gdx.GDX()
@@ -43,18 +49,15 @@ class TestFile(TestCase):
         f = gdx.File(URI)
         params = f.parameters()
         assert len(params) == actual_info['N parameters']
-        assert all(map(lambda s: isinstance(s, gdx.Parameter), params))
 
     def test_sets(self):
         f = gdx.File(URI)
         sets = f.sets()
-        assert len(sets) == actual_info['N sets']
-        assert all(map(lambda s: isinstance(s, gdx.Set), sets))
+        assert len(sets) == actual_info['N sets'] + 1
 
     def test_get_symbol(self):
         f = gdx.File(URI)
-        s = f.get_symbol('s')
-        assert isinstance(s, gdx.Set)
+        f['s']
 
     def test_get_symbol_by_index(self):
         f = gdx.File(URI)
@@ -87,13 +90,8 @@ class TestSymbol:
 class TestSet(TestCase):
     @classmethod
     def setUpClass(self):
-        self.file = gdx.File(URI, lazy=True)
-        self.star = self.file.get_symbol('*')
-
-    def test_depth(self):
-        assert self.star.depth == 0, self.star.depth
-        assert self.file.s.depth == 1, self.file.s.depth
-        assert self.file.s1.depth == 2, self.file.s1.depth
+        self.file = gdx.File(URI)
+        self.star = self.file['*']
 
     def test_len(self):
         assert len(self.file.s) == len(actual['s'])
@@ -107,20 +105,21 @@ class TestSet(TestCase):
             self.file.s[i + 1]
 
     def test_index(self):
-        assert self.file.s.get_loc('d') == 3
+            assert np.argwhere(self.file.s.values == 'd') == 3
 
     def test_iter(self):
         for i, elem in enumerate(self.file.s):
             assert actual['s'][i] == elem
 
     def test_domain(self):
-        assert self.file.s.domain == [self.star]
-        assert self.file.t.domain == [self.star]
-        assert self.file.u.domain == [self.star]
-        assert self.file.s1.domain == [self.file.s]
-        assert self.file.s2.domain == [self.file.s]
-        assert self.file.s3.domain == [self.file.s, self.file.t]
-        assert self.file.s4.domain == [self.file.s, self.file.t, self.file.u]
+        domain = lambda name: self.file[name].attrs['_gdx_domain']
+        assert list_cmp(domain('s'), ['*'])
+        assert list_cmp(domain('t'), ['*'])
+        assert list_cmp(domain('u'), ['*'])
+        assert list_cmp(domain('s1'), ['s'])
+        assert list_cmp(domain('s2'), ['s'])
+        assert list_cmp(domain('s3'), ['s', 't'])
+        assert list_cmp(domain('s4'), ['s', 't', 'u'])
 
 
 class TestParameter:
