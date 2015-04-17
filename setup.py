@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(name='PyGDX',
       version='2',
-      description='GAMS Data Exchange (GDX) file access',
       author='Paul Natsuo Kishimoto',
       author_email='mail@paul.kishimoto.name',
-      install_requires=['numpy', 'pandas', 'xray'],
+      description='GAMS Data Exchange (GDX) file access',
+      install_requires=['xray >= 0.4'],
       url='https://github.com/khaeru/py-gdx',
-      packages=['gdx'],
+      packages=find_packages(),
       )
