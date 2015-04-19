@@ -1,6 +1,6 @@
 from itertools import chain, zip_longest
 
-from numpy import nan
+import numpy as np
 from pandas import Index, MultiIndex, Series
 from xray import DataArray, Dataset
 
@@ -9,14 +9,19 @@ import gdxcc
 from .api import type_str, vartype_str, GDX
 
 # commented: for debugging
-# import logging
-# from logging import debug, warn
+from logging import debug, info
 # logging.basicConfig(level=logging.WARNING)
 
 
 __all__ = [
     'File',
     ]
+
+__version__ = 2
+
+
+def ix(index):
+    return [k for k in index.to_index() if k != '']
 
 
 class File(Dataset):
@@ -27,9 +32,14 @@ class File(Dataset):
     loaded until each parameter is first accessed.
 
     """
-    def __init__(self, filename='', skip=set(), mode='r', lazy=True):
+    _api = None
+    _index = []
+    _state = {}
+    _alias = {}
+
+    def __init__(self, filename='', lazy=True):
         """Constructor."""
-        Dataset.__init__(self)
+        super().__init__()
 
         # load the GDX API
         self._api = GDX()
@@ -43,8 +53,6 @@ class File(Dataset):
         self.attrs['element_count'] = ec
 
         self._index = [None for _ in range(sc + 1)]
-        self._to_skip = skip
-        self._skipped = []
         self._state = {}
         self._alias = {}
 
@@ -77,25 +85,21 @@ class File(Dataset):
             vartype_str_ = ''
         attrs['type_str'] = '{} {}'.format(vartype_str_, type_str_)
 
-        if name in self._to_skip:
-            # debug('Skipping {} as directed.'.format(name))
-            return
-        # debug('Loading {name}: {dim}-D, {records} records, '
-        #       '"{description}"'.format(**attrs))
+        debug('Loading #{index} {name}: {dim}-D, {records} records, '
+              '"{description}"'.format(**attrs))
 
         # Equations and aliases require limited processing
         if type_code == gdxcc.GMS_DT_EQU:
-            # warn('Loading of GMS_DT_EQU not implemented: {} {} not loaded.'.
-            #      format(index, name))
+            info('Loading of GMS_DT_EQU not implemented: {} {} not loaded.'.
+                 format(index, name))
             return
         elif type_code == gdxcc.GMS_DT_ALIAS:
-            parent = self[desc.replace('Aliased with ', '')]
-            self._alias[name] = parent.name
-            if parent.attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET:
-                new_var = parent.copy()
-                new_var.name = name
-                Dataset.merge(self, {name: new_var}, inplace=True)
-                Dataset.set_coords(self, name, inplace=True)
+            parent = desc.replace('Aliased with ', '')
+            self._alias[name] = parent
+            if self[parent].attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET:
+                self._variables[name] = self._variables[parent]
+                self._state[name] = True
+                super().set_coords(name, inplace=True)
             else:
                 raise NotImplementedError('Cannot handle aliases of symbols '
                                           'except GMS_DT_SET: {} {} not loaded'
@@ -105,16 +109,31 @@ class File(Dataset):
         # Read the domain of the set, as a list of names
         try:
             domain = self._api.symbol_get_domain_x(index)
+            debug('domain: {}'.format(domain))
         except Exception:
             assert name == '*'
             domain = []
-        attrs['domain'] = domain
 
+        attrs['domain'] = domain
+        self._state[name] = {'attrs': attrs}
+
+        if type_code == gdxcc.GMS_DT_SET or not lazy:
+            self._load_symbol_data(name)
+
+    def _load_symbol_data(self, name):
+        attrs = self._state[name]['attrs']
+        index, dim, domain, records = [attrs[k] for k in ('index', 'dim',
+                                                          'domain', 'records')]
+        self._cache_data(name, index, dim, records)
+        domain = self._infer_domain(name, index, dim, domain)
+        self._add_symbol(name, dim, domain, attrs)
+
+    def _cache_data(self, name, index, dim, records):
         # Read the elements of the domain directly.
-        n_records2 = self._api.data_read_str_start(index)
-        assert n_records == n_records2, \
+        records2 = self._api.data_read_str_start(index)
+        assert records == records2, \
             ('{}: gdxSymbolInfoX ({}) and gdxDataReadStrStart ({}) disagree on'
-             ' number of records.').format(name, n_records, n_records2)
+             ' number of records.').format(name, records, records2)
 
         # Indices of data records, one list per dimension
         elements = [list() for _ in range(dim)]
@@ -136,10 +155,18 @@ class File(Dataset):
                 # element).
                 data[key] = value[gdxcc.GMS_VAL_LEVEL]
         except Exception:
-            if len(data) == n_records:
+            if len(data) == records:
                 pass
             else:
                 raise
+
+        self._state[name].update({
+            'data': data,
+            'elements': elements,
+            })
+
+    def _infer_domain(self, name, index, dim, domain):
+        elements = self._state[name]['elements']
 
         # Domain as a list of references
         domain_ = [None for _junk in range(dim)] if index > 0 else []
@@ -155,57 +182,71 @@ class File(Dataset):
                         len(s) < len(domain_[i]):
                     domain_[i] = s
 
-        domain = [d.name for d in domain_]
-        attrs['domain_inferred'] = domain
-        # debug('domain: {}'.format(domain))
+        inferred = [d.name for d in domain_]
+        debug('inferred domain: {}'.format(inferred))
+        self._state[name]['attrs']['domain_inferred'] = inferred
+        return inferred
 
-        self._state[name] = {
-            'attrs': attrs,
-            'data': data,
-            'domain': domain,
-            'elements': elements,
-            }
+    def _root_dim(self, dim):
+        parent = self[dim].dims[0]
+        return dim if parent == dim else self._root_dim(parent)
 
-        if type_code == gdxcc.GMS_DT_SET or not lazy:
-            self._add_symbol(name)
+    def _empty(self, *dims, **kwargs):
+        """Return an empty np.ndarray for a GAMS Set or Parameter."""
+        size = []
+        dtypes = []
+        for d in dims:
+            size.append(len(self[d]))
+            dtypes.append(self[d].dtype)
+        dtype = kwargs.pop('dtype', np.result_type(*dtypes))
+        fv = kwargs.pop('fill_value')
+        return np.full(size, fill_value=fv, dtype=dtype)
 
-    def _add_symbol(self, name):
-        attrs = self._state[name]['attrs']
-        dim = self._state[name]['attrs']['dim']
+    def _add_symbol(self, name, dim, domain, attrs):
+        gdx_attrs = {'_gdx_{}'.format(k): v for k, v in attrs.items()}
         data = self._state[name]['data']
-        domain = self._state[name]['domain']
         elements = self._state[name]['elements']
+        self._state[name] = True
 
+        kwargs = {}
         # Continue loading
         if dim == 0:
-            new_var = data.popitem()
-        elif attrs['type_code'] == gdxcc.GMS_DT_SET and dim == 1:
-            new_var = elements[0]
+            # Scalar value
+            super().__setitem__(name, ([], data.popitem(), gdx_attrs))
+            return
+        elif attrs['type_code'] == gdxcc.GMS_DT_SET:
+            if dim == 1:
+                if (domain == ['*'] or domain == []):
+                    # One-dimensional, 'top-level' Set
+                    self.coords[name] = elements[0]
+                    self.coords[name].attrs = gdx_attrs
+                    return
+                kwargs['fill_value'] = ''
+            else:
+                kwargs['dtype'] = bool
+                kwargs['fill_value'] = False
+            dims = [self._root_dim(d) for d in domain]
+            self.coords.__setitem__(name, (dims, self._empty(*domain,
+                                                             **kwargs),
+                                           gdx_attrs))
+            for k in data.keys():
+                self[name].loc[k] = k if dim == 1 else True
         else:
-            try:
-                new_var = self._to_dataarray(domain, elements, data,
-                                             attrs['type_code'])
-            except MemoryError:
-                self._state[name] = None
-                # warn('Skipping {} because of MemoryError'.format(name))
-                return
-
-        Dataset.merge(self, {name: new_var}, inplace=True, join='left')
-
-        if attrs['type_code'] == gdxcc.GMS_DT_SET:
-            Dataset.set_coords(self, name, inplace=True)
-
-        for k, v in attrs.items():
-            self[name].attrs['_gdx_' + k] = v
-
-        self._state[name] = True
+            kwargs['dtype'] = float
+            kwargs['fill_value'] = np.nan
+            dims = [self._root_dim(d) for d in domain]
+            self.__setitem__(name, (dims, self._empty(*domain, **kwargs),
+                                    gdx_attrs))
+            tmp = Series(data)
+            tmp.index.names = domain
+            self[name] = DataArray.from_series(tmp)
 
     def _to_dataarray(self, domain, elements, data, type_code):
         assert type_code in (gdxcc.GMS_DT_PAR, gdxcc.GMS_DT_SET,
                              gdxcc.GMS_DT_VAR)
 
         kwargs = {}
-        fill = nan
+        fill = np.nan
 
         # To satisfy xray.DataArray.__init__, two dimensions must not have the
         # same name unless they have the same length. Construct a 'fake'
@@ -220,9 +261,12 @@ class File(Dataset):
                                    for i in dim]) for e in star]
 
         if type_code == gdxcc.GMS_DT_SET:
-            data = dict(zip_longest(data.keys(), [True], fillvalue=True))
             fill = False
-            kwargs['dtype'] = bool
+            if len(domain) > 1:
+                data = dict(zip_longest(data.keys(), [True], fillvalue=True))
+                kwargs['dtype'] = bool
+            else:
+                data = {k: k for k, v in data.items()}
 
         if len(data) == 0:
             # Dummy data
@@ -240,12 +284,23 @@ class File(Dataset):
                 tuples = list(chain(tuples, extra_tuples))
             idx = MultiIndex.from_tuples(tuples, names=domain)
 
-        return DataArray.from_series(Series(data, index=idx, **kwargs))
+        result = DataArray.from_series(Series(data, index=idx, **kwargs))
+        return result.reindex(copy=False, **{d: self[d] for d in domain})
 
     def dealias(self, name):
         """Identify the GDX Symbol that *name* refers to, and return the
         corresponding :class:`xray.DataArray`."""
         return self[self._alias[name]] if name in self._alias else self[name]
+
+    def info(self, name):
+        """Informal string representation of a Symbol."""
+        if isinstance(self._state[name], dict):
+            attrs = self._state[name]['attrs']
+            return '{} {}({}) — {} records: {}'.format(
+                attrs['type_str'], name, ','.join(attrs['domain']),
+                attrs['records'], attrs['description'])
+        else:
+            print(self[name])
 
     def _loaded_and_cached(self, type_code):
         names = set()
@@ -259,6 +314,9 @@ class File(Dataset):
             if tc == type_code:
                 names.add(name)
         return names
+
+    def set(self, name):
+        return [k for k in self[name].to_index() if k != '']
 
     def sets(self):
         """Return a list of all GDX Sets."""
@@ -283,10 +341,10 @@ class File(Dataset):
     def __getitem__(self, key):
         """Set element access."""
         try:
-            return Dataset.__getitem__(self, key)
+            return super().__getitem__(key)
         except KeyError:
             if isinstance(self._state[key], dict):
-                self._add_symbol(key)
-                return Dataset.__getitem__(self, key)
+                self._load_symbol_data(key)
+                return super().__getitem__(key)
             else:
                 raise
