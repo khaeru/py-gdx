@@ -1,3 +1,5 @@
+from itertools import cycle
+
 import numpy
 import pandas
 import xray
@@ -30,7 +32,7 @@ class File(xray.Dataset):
     _state = {}
     _alias = {}
 
-    def __init__(self, filename='', lazy=True):
+    def __init__(self, filename='', lazy=True, skip=set()):
         """Constructor."""
         super().__init__()  # Invoke Dataset constructor
 
@@ -53,15 +55,17 @@ class File(xray.Dataset):
 
         # Read symbols
         for s_num in range(sc + 1):
-            self._load_symbol(s_num, lazy)
+            name, type_code = self._load_symbol(s_num)
+            if type_code == gdxcc.GMS_DT_SET:
+                self._load_symbol_data(name)
 
-    def _load_symbol(self, index, lazy=True):
-        """Load the *index*-th Symbol in the GDX file.
+        if not lazy:
+            for name in filter(None, self._index):
+                if name not in skip:
+                    self._load_symbol_data(name)
 
-        If *lazy* is True and the Symbol is a GDX Parameter, only basic is
-        loaded, and not its actual contents.
-
-        """
+    def _load_symbol(self, index):
+        """Load the *index*-th Symbol in the GDX file."""
         # Load basic information
         name, dim, type_code = self._api.symbol_info(index)
         n_records, vartype, desc = self._api.symbol_info_x(index)
@@ -95,7 +99,8 @@ class File(xray.Dataset):
         if type_code == gdxcc.GMS_DT_EQU:
             info('Loading of GMS_DT_EQU not implemented: {} {} not loaded.'.
                  format(index, name))
-            return
+            self._state[name] = None
+            return name, type_code
         elif type_code == gdxcc.GMS_DT_ALIAS:
             parent = desc.replace('Aliased with ', '')
             self._alias[name] = parent
@@ -108,7 +113,7 @@ class File(xray.Dataset):
                 raise NotImplementedError('Cannot handle aliases of symbols '
                                           'except GMS_DT_SET: {} {} not loaded'
                                           .format(index, name))
-            return
+            return name, type_code
 
         # The Symbol is either a Set, Parameter or Variable
         try:  # Read the domain, as a list of names
@@ -122,13 +127,7 @@ class File(xray.Dataset):
         attrs['domain'] = domain
         self._state[name] = {'attrs': attrs}
 
-        # Trigger loading of the Symbol's data
-        if type_code == gdxcc.GMS_DT_SET or not lazy:
-            try:
-                self._load_symbol_data(name)
-            except Exception:
-                print(attrs['type_str'], name)
-                raise
+        return name, type_code
 
     def _load_symbol_data(self, name):
         """Load the Symbol *name*."""
@@ -147,13 +146,12 @@ class File(xray.Dataset):
         # GDX file contains an empty Set named 'SameAs' with domain (*,*). Do
         # not read this
         if name == 'SameAs' and domain == ['*', '*'] and records == 0:
-            self._state[name] = True
+            self._state[name] = None
             self._index[index] = None
             return
 
-        # Try to quess a set smaller than '*' for one or more dimensions of the
-        # Symbol
-        domain = self._infer_domain(name, index, dim, domain)
+        domain = self._infer_domain(name, domain,
+                                    self._state[name]['elements'])
 
         # Create an xray.DataArray with the Symbol's data
         self._add_symbol(name, dim, domain, attrs)
@@ -198,7 +196,7 @@ class File(xray.Dataset):
             'elements': elements,
             })
 
-    def _infer_domain(self, name, index, dim, domain):
+    def _infer_domain(self, name, domain, elements):
         """Infer the domain of the Symbol *name*.
 
         Lazy GAMS modellers may create variables like myvar(*,*,*,*). If the
@@ -209,28 +207,35 @@ class File(xray.Dataset):
         *name*'s data.
 
         """
-        elements = self._state[name]['elements']
+        if '*' not in domain:
+            return domain
+        debug('guessing a better domain for {}: {}'.format(name, domain))
 
         # Domain as a list of references to Variables in the File/xray.Dataset
-        domain_ = [None for _ in range(dim)] if index > 0 else []
-        # If domain is specified for the symbol, try to use that information
-        for i, d in enumerate(domain):
-            domain_[i] = self[d]
-            if d != '*' or len(elements[i]) == 0:
-                assert set(domain_[i].values).issuperset(elements[i])
-                continue  # The stated domain, not *, matches the data
-            # Compute the domain directly for this dimension
+        domain_ = [self[d] for d in domain]
+
+        for i, d in enumerate(domain_):  # Iterate over dimensions
+            e = set(elements[i])
+            if d.name != '*' or len(e) == 0:
+                assert set(d.values).issuperset(e)
+                continue  # The stated domain matches the data; or no data
+            # '*' is given, try to find a smaller domain for this dimension
             for s in self.coords.values():  # Iterate over every Set/Coordinate
-                if s.ndim == 1 and set(s.values).issuperset(elements[i]) and \
-                        len(s) < len(domain_[i]):
-                    domain_[i] = s  # Found a smaller Set; use this instead
+                if s.ndim == 1 and set(s.values).issuperset(e) and \
+                        len(s) < len(d):
+                    d = s  # Found a smaller Set; use this instead
+            domain_[i] = d
 
         # Convert the references to names
         inferred = [d.name for d in domain_]
-        debug('inferred domain: {}'.format(inferred))
 
-        # Store the result
-        self._state[name]['attrs']['domain_inferred'] = inferred
+        if domain != inferred:
+            # Store the result
+            self._state[name]['attrs']['domain_inferred'] = inferred
+            debug('…inferred {}.'.format(inferred))
+        else:
+            debug('…failed.')
+
         return inferred
 
     def _root_dim(self, dim):
@@ -303,11 +308,21 @@ class File(xray.Dataset):
             super().__setitem__(name, (dims, self._empty(*domain, **kwargs),
                                 gdx_attrs))
 
+            # Fill in extra keys
+            longest = numpy.argmax(self[name].values.shape)
+            iters = []
+            for i, d in enumerate(dims):
+                if i == longest:
+                    iters.append(self[d].to_index())
+                else:
+                    iters.append(cycle(self[d].to_index()))
+            data.update({k: numpy.nan for k in set(zip(*iters)) -
+                         set(data.keys())})
+
             # Use pandas and xray IO methods to convert data, a dict, to a
             # xray.DataArray of the correct shape, then extract its values
             tmp = pandas.Series(data)
             tmp.index.names = dims
-            # TODO this line fails on some symbols with duplicated dimensions
             tmp = xray.DataArray.from_series(tmp).reindex_like(self[name])
             self[name].values = tmp.values
 
