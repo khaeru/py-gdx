@@ -13,6 +13,9 @@ from logging import debug, info
 # logging.basicConfig(level=logging.WARNING)
 
 
+__version__ = '2'
+
+
 __all__ = [
     'File',
     ]

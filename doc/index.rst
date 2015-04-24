@@ -1,7 +1,9 @@
-GAMS GDX file data access
-=========================
+GDX file data access
+====================
 
-PyGDX is a Python 3 package for accessing data stored in GDX-formatted files, through the Python bindings for the GAMS_ `GDX API`_. It uses xray_ to provide labeled, multidimensional data structures for accessing data.
+pyGDX is a Python 3 package for accessing data stored in *GAMS Data eXchange* (GDX) files. GDX is a proprietary, binary file format used by the General Algebraic Modelling System (GAMS_); pyGDX uses the Python bindings for the `GDX API`_.
+
+pyGDX uses xray_ to provide labeled, multidimensional data structures for accessing data; a :class:`gdx.File` is a thinly-wrapped :class:`xray.Dataset`.
 
 Documentation
 -------------
@@ -9,7 +11,9 @@ Documentation
 .. toctree::
    :maxdepth: 2
 
-   reference
+   gdx
+   file
+   api
    todos
 
 License
