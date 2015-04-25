@@ -9,6 +9,7 @@ before_install () {
     curl -O $GAMS_URL
     unzip linux_x64_64_sfx.exe
     mv gams24.4_linux_x64_64_sfx $HOME/gams
+    ls -l $HOME $HOME/gams
     cd $HOME/gams/apifiles/Python/api
     python gdxsetup.py install
   fi
