@@ -16,7 +16,13 @@ cache:
 
 before-script: export PATH=$HOME/gams:$PATH
 
-script: ls -l && which -a gams && echo "$PATH"
+script:
+  - pwd
+  - ls -l
+  - ls $HOME
+  - echo "$PATH"
+  - which -a gams
+  - $HOME/gams/gams
 
 notifications:
   email: false
