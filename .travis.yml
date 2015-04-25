@@ -11,10 +11,10 @@ install: pip install .
 
 cache:
   directories:
-    - $HOME/gams
+    - /opt/gams
     - $HOME/virtualenv/python$TRAVIS_PYTHON_VERSION*/lib/python*/site-packages
 
-before_script: export PATH=$HOME/gams:$PATH
+before_script: export PATH=/opt/gams:$PATH
 
 script: ./travis.sh script
 
