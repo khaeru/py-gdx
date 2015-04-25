@@ -4,5 +4,9 @@ python:
   - "3.3"
   - "3.4"
   - "nightly"
-install: "pip install -r doc/requirements.txt"
+install:
+  - pip install -r doc/requirements.txt
+  - pip install nose2
 script: nose2
+notifications:
+  email: false
