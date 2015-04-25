@@ -22,4 +22,5 @@ script () {
 case $1 in
   before_install) before_install;;
   script) script;;
+  *) exit 1;;
 esac

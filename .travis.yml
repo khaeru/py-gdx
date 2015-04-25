@@ -14,7 +14,7 @@ cache:
     - $HOME/gams
     - $HOME/virtualenv/python$TRAVIS_PYTHON_VERSION*/lib/python*/site-packages
 
-script: ./travis.sh build
+script: ./travis.sh script
 
 notifications:
   email: false
