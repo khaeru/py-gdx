@@ -4,9 +4,10 @@ python:
   - "3.3"
   - "3.4"
   - "nightly"
-install:
-  - pip install -r doc/requirements.txt
-  - pip install nose2
+before_install: ./travis.sh
+cache:
+  directories:
+    - $HOME/.pip-cache
 script: nose2
 notifications:
   email: false
