@@ -16,8 +16,8 @@ before_install () {
 
 script () {
   echo "$PATH"
-  gams
-  python setup.py test
+  ls $HOME/gams/
+#  python setup.py test
 }
 
 case $1 in
