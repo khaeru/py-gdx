@@ -14,6 +14,8 @@ cache:
     - $HOME/gams
     - $HOME/virtualenv/python$TRAVIS_PYTHON_VERSION*/lib/python*/site-packages
 
+before_script: export PATH=$HOME/gams:$PATH
+
 script: ./travis.sh script
 
 notifications:
