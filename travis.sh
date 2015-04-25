@@ -14,14 +14,17 @@ before_install () {
     mv gams24.4_linux_x64_64_sfx/* $HOME/gams/
     cd $HOME/gams/apifiles/Python/api
     python gdxsetup.py install
+    # Remove a bunch of stuff that doesn't need to be cached
+    cd $HOME/gams
+    rm -r apifiles docs *_ml
   fi
 }
 
 script () {
   # Prepare data
-  pushd data
-  gams tests
-  popd
+  cd data
+  gams tests.gms
+  cd ..
   # Run tests
   python setup.py test
 }
