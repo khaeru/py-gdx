@@ -4,12 +4,19 @@ python:
   - "3.3"
   - "3.4"
   - "nightly"
-before_install: ./travis.sh
+
+before_install: ./travis.sh before_install
+
 install: pip install .
+
 cache:
   directories:
-    - $HOME/gams*_linux_x64_64_sfx
+    - $HOME/gams
     - $HOME/virtualenv/python$TRAVIS_PYTHON_VERSION*/lib/python*/site-packages
+
+before-script: export PATH=$HOME/gams:$PATH
+
 script: python setup.py test
+
 notifications:
   email: false
