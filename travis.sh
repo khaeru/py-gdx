@@ -8,7 +8,7 @@ before_install () {
   if ! python -m gdxcc; then
     curl -O $GAMS_URL
     unzip linux_x64_64_sfx.exe
-    mv --verbose gams24.4_linux_x64_64_sfx $HOME/gams
+    mv --verbose gams24.4_linux_x64_64_sfx/* $HOME/gams/
     cd $HOME/gams/apifiles/Python/api
     python gdxsetup.py install
   fi
