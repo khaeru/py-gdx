@@ -8,6 +8,7 @@ before_install: ./travis.sh
 install: pip install .
 cache:
   directories:
+    - $HOME/gams*_linux_x64_64_sfx
     - $HOME/virtualenv/python$TRAVIS_PYTHON_VERSION*/lib/python*/site-packages
 script: python setup.py test
 notifications:
