@@ -16,7 +16,7 @@ cache:
 
 before-script: export PATH=$HOME/gams:$PATH
 
-script: python setup.py test
+script: ls -l && which -a gams && echo "$PATH"
 
 notifications:
   email: false
