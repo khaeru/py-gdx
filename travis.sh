@@ -15,8 +15,7 @@ before_install () {
 }
 
 script () {
-  echo "$PATH"
-  ls $HOME/gams/
+  ls -l $HOME/gams
 #  python setup.py test
 }
 
