@@ -30,7 +30,6 @@ actual_info = {
 
 
 def list_cmp(l1, l2):
-    print(l1, l2)
     return all([i1 == i2 for i1, i2 in zip(l1, l2)])
 
 
@@ -95,8 +94,8 @@ class TestSet(TestCase):
 
     def test_len(self):
         assert len(self.file.s) == len(actual['s'])
-        assert len(self.file.s1) == len(actual['s1'])
-        assert len(self.file.s2) == len(actual['s2'])
+        assert len(self.file.set('s1')) == len(actual['s1'])
+        assert len(self.file.set('s2')) == len(actual['s2'])
 
     def test_getitem(self):
         for i in range(len(self.file.s)):
