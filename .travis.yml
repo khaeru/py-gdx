@@ -1,10 +1,19 @@
 language: python
 python:
-  - "2.6"
-  - "2.7"
-  - "3.2"
-  - "3.3"
   - "3.4"
-  - "nightly"
-install: "pip install -r doc/requirements.txt"
-script: nose2
+
+before_install: ./travis.sh before_install
+
+install: pip install .
+
+cache:
+  directories:
+    - $HOME/gams
+    - $HOME/virtualenv/python$TRAVIS_PYTHON_VERSION*/lib/python*/site-packages
+
+before_script: export PATH=$HOME/gams:$PATH
+
+script: ./travis.sh script
+
+notifications:
+  email: false

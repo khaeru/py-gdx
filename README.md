@@ -1,4 +1,7 @@
 # PyGDX
+[![Build Status](https://travis-ci.org/khaeru/py-gdx.svg?branch=master)](https://travis-ci.org/khaeru/py-gdx)
+[![Documentation Status](https://readthedocs.org/projects/pygdx/badge/?version=latest)](https://readthedocs.org/projects/pygdx/?badge=latest)
+
 
 PyGDX is a Python 3 package for accessing data stored in GDX-formatted files, through the Python bindings for the [GAMS](http://www.gams.com) [GDX API](http://www.gams.com/dd/docs/api/expert-level/gdxqdrep.html). Inspired by the similar package, also named [py-gdx, by Geoff
 Leyland](https://github.com/geoffleyland/py-gdx), this version makes use of [xray](https://github.com/xray/xray) to provide labelled data structures which can be easily manipulated with [NumPy](http://www.numpy.org/) for calculations and plotting.
