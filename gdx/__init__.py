@@ -59,7 +59,7 @@ class File(xray.Dataset):
         # Read symbols
         for s_num in range(sc + 1):
             name, type_code = self._load_symbol(s_num)
-            if type_code == gdxcc.GMS_DT_SET:
+            if type_code == gdxcc.GMS_DT_SET and name not in skip:
                 self._load_symbol_data(name)
 
         if not lazy:
