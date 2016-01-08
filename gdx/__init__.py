@@ -8,9 +8,10 @@ import gdxcc
 
 from .api import type_str, vartype_str, GDX
 
-# commented: for debugging
 from logging import debug, info
-# logging.basicConfig(level=logging.WARNING)
+# commented: for debugging
+# import logging
+# logging.basicConfig(level=logging.DEBUG)
 
 
 __version__ = '2'
@@ -275,7 +276,7 @@ class File(xray.Dataset):
             return
         elif attrs['type_code'] == gdxcc.GMS_DT_SET:  # GAMS Set
             if dim == 1:
-                if (domain == ['*'] or domain == []):
+                if (domain == ['*'] or domain == [] or domain == [name]):
                     # One-dimensional, 'top-level' Set
                     self.coords[name] = elements[0]
                     self.coords[name].attrs = gdx_attrs
@@ -427,6 +428,7 @@ class File(xray.Dataset):
             return super().__getitem__(key)
         except KeyError:
             if isinstance(self._state[key], dict):
+                debug('Lazy-loading {}'.format(key))
                 self._load_symbol_data(key)
                 return super().__getitem__(key)
             else:
