@@ -3,10 +3,9 @@
 [![Documentation Status](https://readthedocs.org/projects/pygdx/badge/?version=latest)](https://readthedocs.org/projects/pygdx/?badge=latest)
 
 
-PyGDX is a Python 3 package for accessing data stored in GDX-formatted files, through the Python bindings for the [GAMS](http://www.gams.com) [GDX API](http://www.gams.com/dd/docs/api/expert-level/gdxqdrep.html). Inspired by the similar package, also named [py-gdx, by Geoff
-Leyland](https://github.com/geoffleyland/py-gdx), this version makes use of [xray](https://github.com/xray/xray) to provide labelled data structures which can be easily manipulated with [NumPy](http://www.numpy.org/) for calculations and plotting.
+PyGDX is a Python 3 package for accessing data stored in GDX-formatted files, through the Python bindings for the [GAMS](http://www.gams.com) [GDX API](http://www.gams.com/dd/docs/api/expert-level/gdxqdrep.html). Inspired by the similar package, also named [py-gdx, by Geoff Leyland](https://github.com/geoffleyland/py-gdx), this version makes use of [xarray](http://xarray.pydata.org) to provide labelled data structures which can be easily manipulated with [NumPy](http://www.numpy.org) for calculations and plotting.
 
-**Documentation** is available at http://pygdx.readthedocs.org/, built automatically from the contents of the Github repository.
+**Documentation** is available at http://pygdx.readthedocs.org, built automatically from the contents of the Github repository.
 
 PyGDX is provided under the **MIT License** (see `LICENSE`).
 

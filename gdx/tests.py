@@ -111,7 +111,7 @@ class TestSet(TestCase):
             assert actual['s'][i] == elem
 
     def test_domain(self):
-        domain = lambda name: self.file[name].attrs['_gdx_domain']
+        def domain(name): return self.file[name].attrs['_gdx_domain']
         assert list_cmp(domain('s'), ['*'])
         assert list_cmp(domain('t'), ['*'])
         assert list_cmp(domain('u'), ['*'])
