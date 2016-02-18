@@ -1,5 +1,5 @@
 from os.path import dirname
-from subprocess import check_output
+from shutil import which
 
 import gdxcc
 
@@ -42,17 +42,8 @@ def _gams_dir():
 
     Returns the path to the  executable is a required argument of
     ``gdxCreateD``, the method for connecting to the GDX API.
-
-    .. todo::
-
-       This function relies on the shell utility `which`, and will probably
-       not work on Windows. Extend.
     """
-    try:
-        result = dirname(check_output(['which', 'gams'])).decode()
-        return result
-    except OSError:
-        return ''
+    return dirname(which('gams'))
 
 
 class GDX:
