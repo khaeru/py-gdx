@@ -22,10 +22,11 @@ actual = OrderedDict([
     ('p1', None),
     ('p2', None),
     ('p3', None),
+    ('p4', None),
     ])
 actual_info = {
     'N sets': 9,
-    'N parameters': 3,
+    'N parameters': 4,
     }
 
 
@@ -39,47 +40,50 @@ class TestGDX:
 
 
 class TestFile(TestCase):
+    def setUp(self):
+        self.f = gdx.File(URI)
+
     def test_init(self):
         gdx.File(URI)
         with self.assertRaises(FileNotFoundError):
             gdx.File('nonexistent.gdx')
 
     def test_parameters(self):
-        f = gdx.File(URI)
-        params = f.parameters()
+        params = self.f.parameters()
         assert len(params) == actual_info['N parameters']
 
     def test_sets(self):
-        f = gdx.File(URI)
-        sets = f.sets()
+        sets = self.f.sets()
         assert len(sets) == actual_info['N sets'] + 1
 
     def test_get_symbol(self):
-        f = gdx.File(URI)
-        f['s']
+        self.f['s']
 
     def test_get_symbol_by_index(self):
-        f = gdx.File(URI)
         for i, name in enumerate(actual.keys()):
-            sym = f.get_symbol_by_index(i)
+            sym = self.f.get_symbol_by_index(i)
             assert sym.name == name
         # Giving too high an index results in IndexError
         with self.assertRaises(IndexError):
-            f.get_symbol_by_index(i + 1)
+            self.f.get_symbol_by_index(i + 1)
 
     def test_getattr(self):
-        f = gdx.File(URI)
         for name in actual.keys():
-            getattr(f, name)
+            getattr(self.f, name)
         with self.assertRaises(AttributeError):
-            f.notasymbolname
+            self.f.notasymbolname
 
     def test_getitem(self):
-        f = gdx.File(URI)
         for name in actual.keys():
-            f[name]
+            self.f[name]
         with self.assertRaises(KeyError):
-            f['notasymbolname']
+            self.f['notasymbolname']
+
+    def test_extract(self):
+        for name in actual.keys():
+            self.f.extract(name)
+        with self.assertRaises(KeyError):
+            self.f.extract('notasymbolname')
 
 
 class TestSymbol:
@@ -87,8 +91,7 @@ class TestSymbol:
 
 
 class TestSet(TestCase):
-    @classmethod
-    def setUpClass(self):
+    def setUp(self):
         self.file = gdx.File(URI)
         self.star = self.file['*']
 
@@ -111,7 +114,7 @@ class TestSet(TestCase):
             assert actual['s'][i] == elem
 
     def test_domain(self):
-        domain = lambda name: self.file[name].attrs['_gdx_domain']
+        def domain(name): return self.file[name].attrs['_gdx_domain']
         assert list_cmp(domain('s'), ['*'])
         assert list_cmp(domain('t'), ['*'])
         assert list_cmp(domain('u'), ['*'])
@@ -119,16 +122,3 @@ class TestSet(TestCase):
         assert list_cmp(domain('s2'), ['s'])
         assert list_cmp(domain('s3'), ['s', 't'])
         assert list_cmp(domain('s4'), ['s', 't', 'u'])
-
-
-class TestParameter:
-    @classmethod
-    def setUpClass(self):
-        self.file = gdx.File(URI)
-
-    def test_example(self):
-        self.file.p1
-
-
-class TestEquation:
-    pass
