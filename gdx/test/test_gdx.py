@@ -80,7 +80,7 @@ class TestFile(TestCase):
             self.f['notasymbolname']
 
     def test_extract(self):
-        for name in actual.keys():
+        for name in ['p1', 'p2', 'p3', 'p4']:
             self.f.extract(name)
         with self.assertRaises(KeyError):
             self.f.extract('notasymbolname')
