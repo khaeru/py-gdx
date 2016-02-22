@@ -371,7 +371,10 @@ class File(xray.Dataset):
                 # the elements which do not appear in the sub-Set c;, then
                 # rename 'p' to 'c'
                 drop = set(self[p].values) - set(self[c].values) - set('')
-                result = result.drop(drop, dim=p).rename({p: c})
+                result = result.drop(drop, dim=p).swap_dims({p: c})
+        # Drop the names of the old parent sets ('p' in the above loop)—do this
+        # last, in case two dimensions have the same parent
+        result = result.drop(dims.values())
         return result
 
     def info(self, name):
