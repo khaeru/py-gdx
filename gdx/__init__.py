@@ -356,14 +356,14 @@ class File(xray.Dataset):
         dims = {c: self._root_dim(c) for c in result.attrs['_gdx_domain']}
         keep = set(dims.keys()) | set(dims.values())
 
-        # Drop extraneous dimensions
-        result = result.drop(set(result.coords) - keep)
+        # Extraneous dimensions
+        drop_coords = set(result.coords) - keep
 
         # Reduce the data
         for c, p in dims.items():
             if c == '*':  # Dimension is '*', drop empty labels
                 result = result.dropna(dim='*', how='all')
-            elif c == p:
+            elif c == p:  # Dimension already indexed by the correct coord
                 continue
             else:
                 # Dimension is indexed by 'p', but declared 'c'. First drop
@@ -371,10 +371,10 @@ class File(xray.Dataset):
                 # rename 'p' to 'c'
                 drop = set(self[p].values) - set(self[c].values) - set('')
                 result = result.drop(drop, dim=p).swap_dims({p: c})
-        # Drop the names of the old parent sets ('p' in the above loop)—do this
-        # last, in case two dimensions have the same parent
-        result = result.drop(dims.values())
-        return result
+                # Add the old coord to the set of coords to drop
+                drop_coords.add(p)
+        # Do this last, in case two dimensions have the same parent (p)
+        return result.drop(drop_coords)
 
     def info(self, name):
         """Informal string representation of a Symbol."""
