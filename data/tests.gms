@@ -40,6 +40,7 @@ parameters
   p1(s)    'Example parameter with animal data'  / /
   p2(t)    'Example parameter with color data'   / set.t 0 /
   p3(s,t)  'Two-dimensional parameter'           / set.s.y 1 /
+  p4(s1)   'Parameter defined over a subset'     / set.s1 1 /
   ;
 
 p1('a') = 1;
