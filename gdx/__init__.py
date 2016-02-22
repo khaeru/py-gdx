@@ -2,7 +2,10 @@ from itertools import cycle
 
 import numpy
 import pandas
-import xray
+try:
+    import xarray as xr
+except ImportError:
+    import xray as xr
 
 import gdxcc
 
@@ -22,7 +25,7 @@ __all__ = [
     ]
 
 
-class File(xray.Dataset):
+class File(xr.Dataset):
     """Load the file at *filename* into memory.
 
     *mode* must be 'r' (writing GDX files is not currently supported). If
@@ -327,7 +330,7 @@ class File(xray.Dataset):
             # xr.DataArray of the correct shape, then extract its values
             tmp = pandas.Series(data)
             tmp.index.names = dims
-            tmp = xray.DataArray.from_series(tmp).reindex_like(self[name])
+            tmp = xr.DataArray.from_series(tmp).reindex_like(self[name])
             self[name].values = tmp.values
 
     def dealias(self, name):
