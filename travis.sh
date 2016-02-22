@@ -26,7 +26,7 @@ script () {
   gams tests.gms
   cd ..
   # Run tests
-  python setup.py test
+  py.test
 }
 
 case $1 in
