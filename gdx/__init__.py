@@ -30,7 +30,7 @@ class File(xray.Dataset):
     loaded until each parameter is first accessed.
 
     """
-    # For the benefit of xray.Dataset.__getattr__
+    # For the benefit of xr.Dataset.__getattr__
     _api = None
     _index = []
     _state = {}
@@ -157,7 +157,7 @@ class File(xray.Dataset):
         domain = self._infer_domain(name, domain,
                                     self._state[name]['elements'])
 
-        # Create an xray.DataArray with the Symbol's data
+        # Create an xr.DataArray with the Symbol's data
         self._add_symbol(name, dim, domain, attrs)
 
     def _cache_data(self, name, index, dim, records):
@@ -204,18 +204,18 @@ class File(xray.Dataset):
         """Infer the domain of the Symbol *name*.
 
         Lazy GAMS modellers may create variables like myvar(*,*,*,*). If the
-        size of the universal set * is large, then attempting to instantiate
-        a xray.DataArray with this many elements may cause a MemoryError. For
-        every dimenions of *name* defined on the domain '*' this method tries
-        to find a Set from the file which contains all the labels appearing in
-        *name*'s data.
+        size of the universal set * is large, then attempting to instantiate a
+        xr.DataArray with this many elements may cause a MemoryError. For every
+        dimenion of *name* defined on the domain '*' this method tries to find
+        a Set from the file which contains all the labels appearing in *name*'s
+        data.
 
         """
         if '*' not in domain:
             return domain
         debug('guessing a better domain for {}: {}'.format(name, domain))
 
-        # Domain as a list of references to Variables in the File/xray.Dataset
+        # Domain as a list of references to Variables in the File/xr.Dataset
         domain_ = [self[d] for d in domain]
 
         for i, d in enumerate(domain_):  # Iterate over dimensions
@@ -269,7 +269,7 @@ class File(xray.Dataset):
         # loading, which is still in progress
         self._state[name] = True
 
-        kwargs = {}  # Arguments to xray.Dataset.__setitem__()
+        kwargs = {}  # Arguments to xr.Dataset.__setitem__()
         if dim == 0:
             # 0-D Variable or scalar Parameter
             super().__setitem__(name, ([], data.popitem()[1], gdx_attrs))
@@ -290,7 +290,7 @@ class File(xray.Dataset):
                 kwargs['fill_value'] = False
 
             # Don't define over the actual domain dimensions, but over the
-            # parent Set/xray.Coordinates for each dimension
+            # parent Set/xr.Coordinates for each dimension
             dims = [self._root_dim(d) for d in domain]
 
             # Update coords
@@ -307,7 +307,7 @@ class File(xray.Dataset):
 
             dims = [self._root_dim(d) for d in domain]  # Same as above
 
-            # Create an empty xray.DataArray; this ensures that the data
+            # Create an empty xr.DataArray; this ensures that the data
             # read in below has the proper form and indices
             super().__setitem__(name, (dims, self._empty(*domain, **kwargs),
                                 gdx_attrs))
@@ -323,8 +323,8 @@ class File(xray.Dataset):
             data.update({k: numpy.nan for k in set(zip(*iters)) -
                          set(data.keys())})
 
-            # Use pandas and xray IO methods to convert data, a dict, to a
-            # xray.DataArray of the correct shape, then extract its values
+            # Use pandas and xarray IO methods to convert data, a dict, to a
+            # xr.DataArray of the correct shape, then extract its values
             tmp = pandas.Series(data)
             tmp.index.names = dims
             tmp = xray.DataArray.from_series(tmp).reindex_like(self[name])
@@ -332,18 +332,18 @@ class File(xray.Dataset):
 
     def dealias(self, name):
         """Identify the GDX Symbol that *name* refers to, and return the
-        corresponding :class:`xray.DataArray`."""
+        corresponding :class:`xr.DataArray`."""
         return self[self._alias[name]] if name in self._alias else self[name]
 
     def extract(self, name):
         """Extract the GAMS Symbol *name* from the dataset.
 
         The Sets and Parameters in the :class:`File` can be accessed directly,
-        as e.g. `f['name']`; but for more complex xray operations, such as
+        as e.g. `f['name']`; but for more complex xarray operations, such as
         concatenation and merging, this carries along sub-Sets and other
-        Coordinates which confound xray.
+        Coordinates which confound xarray.
 
-        :func:`extract()` returns a self-contained xray.DataArray with the
+        :func:`extract()` returns a self-contained xr.DataArray with the
         declared dimensions of the Symbol (and *only* those dimensions), which
         does not make reference to the :class:`File`.
         """
@@ -357,8 +357,7 @@ class File(xray.Dataset):
         keep = set(dims.keys()) | set(dims.values())
 
         # Drop extraneous dimensions
-        for c in set(result.coords) - keep:
-            del result[c]
+        result = result.drop(set(result.coords) - keep)
 
         # Reduce the data
         for c, p in dims.items():
