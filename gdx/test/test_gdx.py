@@ -23,11 +23,13 @@ actual = OrderedDict([
     ('p2', None),
     ('p3', None),
     ('p4', None),
+    ('p5', None),
     ])
 actual_info = {
     'N sets': 9,
-    'N parameters': 4,
+    'N parameters': 5,
     }
+actual_info['N symbols'] = sum(actual_info.values()) + 1
 
 
 def list_cmp(l1, l2):
@@ -84,6 +86,18 @@ class TestFile(TestCase):
             self.f.extract(name)
         with self.assertRaises(KeyError):
             self.f.extract('notasymbolname')
+
+    def test_implicit(self):
+        assert self.f['p5'].shape == (3, 3)
+
+
+class TestImplicit(TestCase):
+    def setUp(self):
+        self.f = gdx.File(URI, implicit=False)
+
+    def test_implicit(self):
+        N = len(self.f['*'])
+        assert self.f['p5'].shape == (N, N)
 
 
 class TestSymbol:

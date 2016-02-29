@@ -29,8 +29,15 @@ class File(xr.Dataset):
     """Load the file at *filename* into memory.
 
     *mode* must be 'r' (writing GDX files is not currently supported). If
-    *lazy* is ``True`` (default), then the data for GDX parameters is not
-    loaded until each parameter is first accessed.
+    *lazy* is ``True`` (default), then the data for GDX Parameters is not
+    loaded until each individual parameter is first accessed; otherwise all
+    parameters except those listed in *skip* (default: empty) are loaded
+    immediately.
+
+    If *implicit* is ``True`` (default) then, for each dimension of any GDX
+    Parameter declared over '*' (the universal set), an implicit set is
+    constructed, containing only the labels appearing in the respective
+    dimension of that parameter.
 
     """
     # For the benefit of xr.Dataset.__getattr__
@@ -38,8 +45,9 @@ class File(xr.Dataset):
     _index = []
     _state = {}
     _alias = {}
+    _implicit = False
 
-    def __init__(self, filename='', lazy=True, skip=set()):
+    def __init__(self, filename='', lazy=True, implicit=True, skip=set()):
         """Constructor."""
         super().__init__()  # Invoke Dataset constructor
 
@@ -59,6 +67,7 @@ class File(xr.Dataset):
         self._index = [None for _ in range(sc + 1)]
         self._state = {}
         self._alias = {}
+        self._implicit = implicit
 
         # Read symbols
         for s_num in range(sc + 1):
@@ -209,7 +218,7 @@ class File(xr.Dataset):
         Lazy GAMS modellers may create variables like myvar(*,*,*,*). If the
         size of the universal set * is large, then attempting to instantiate a
         xr.DataArray with this many elements may cause a MemoryError. For every
-        dimenion of *name* defined on the domain '*' this method tries to find
+        dimension of *name* defined on the domain '*' this method tries to find
         a Set from the file which contains all the labels appearing in *name*'s
         data.
 
@@ -226,11 +235,22 @@ class File(xr.Dataset):
             if d.name != '*' or len(e) == 0:
                 assert set(d.values).issuperset(e)
                 continue  # The stated domain matches the data; or no data
-            # '*' is given, try to find a smaller domain for this dimension
-            for s in self.coords.values():  # Iterate over every Set/Coordinate
-                if s.ndim == 1 and set(s.values).issuperset(e) and \
-                        len(s) < len(d):
-                    d = s  # Found a smaller Set; use this instead
+            # '*' is given
+            if (self._state[name]['attrs']['type_code'] == gdxcc.GMS_DT_PAR and
+                    self._implicit):
+                d = '_{}_{}'.format(name, i)
+                debug(('Constructing implicit set {} for dimension {} of {}\n'
+                       ' {} instead of {} elements')
+                      .format(d, name, i, len(e), len(self['*'])))
+                self.coords[d] = elements[i]
+                d = self[d]
+            else:
+                # try to find a smaller domain for this dimension
+                # Iterate over every Set/Coordinate
+                for s in self.coords.values():
+                    if s.ndim == 1 and set(s.values).issuperset(e) and \
+                            len(s) < len(d):
+                        d = s  # Found a smaller Set; use this instead
             domain_[i] = d
 
         # Convert the references to names
@@ -350,13 +370,15 @@ class File(xr.Dataset):
         declared dimensions of the Symbol (and *only* those dimensions), which
         does not make reference to the :class:`File`.
         """
-        # Trigger lazy-loading if needed
-        self._load_symbol_data(name)
-
+        # Copy the Symbol, triggering lazy-loading if needed
         result = self[name].copy()
 
         # Declared dimensions of the Symbol, and their parents
-        dims = {c: self._root_dim(c) for c in result.attrs['_gdx_domain']}
+        try:
+            domain = result.attrs['_gdx_domain_inferred']
+        except KeyError:  # No domain was inferred for this Symbol
+            domain = result.attrs['_gdx_domain']
+        dims = {c: self._root_dim(c) for c in domain}
         keep = set(dims.keys()) | set(dims.values())
 
         # Extraneous dimensions

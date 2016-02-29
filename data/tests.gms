@@ -43,6 +43,12 @@ parameters
   p4(s1)   'Parameter defined over a subset'     / set.s1 1 /
   ;
 
+parameter p5(*,*) 'Parameter defined over the universal set' /
+  a.o   1
+  r.US  2
+  CA.b  3
+  /;
+
 p1('a') = 1;
 
 execute_unload 'tests.gdx'
