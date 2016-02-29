@@ -88,16 +88,16 @@ class TestFile(TestCase):
             self.f.extract('notasymbolname')
 
     def test_implicit(self):
-        N = len(self.f['*'])
-        assert self.f['p5'].shape == (N, N)
+        assert self.f['p5'].shape == (3, 3)
 
 
 class TestImplicit(TestCase):
     def setUp(self):
-        self.f = gdx.File(URI, implicit=True)
+        self.f = gdx.File(URI, implicit=False)
 
     def test_implicit(self):
-        assert self.f['p5'].shape == (3, 3)
+        N = len(self.f['*'])
+        assert self.f['p5'].shape == (N, N)
 
 
 class TestSymbol:
