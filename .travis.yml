@@ -8,15 +8,16 @@ python:
   - "3.5"
 
 env:
-  - GAMS=24.4.3
+  - GAMS=24.4
     GAMS_URL=http://d37drm4t2jghv5.cloudfront.net/distributions/24.4.3/linux/linux_x64_64_sfx.exe
 
 before_install:
-  - wget -N $GAMS_URL -O $HOME/.cache/gams/$GAMS.zip
-  - unzip $HOME/.cache/gams/$GAMS.zip
+  - mkdir -p $HOME/.cache/gams/$GAMS
+  - wget -N $GAMS_URL -P $HOME/.cache/gams/$GAMS/
+  - unzip $HOME/.cache/gams/$GAMS/*.zip
   - ln -s gams* gams
   - cd gams/apifiles/Python/api
-  - python setup.py install
+  - python gdxsetup.py install
   - export PATH=$HOME/gams:$PATH
 
 install: python setup.py install
@@ -26,9 +27,7 @@ cache:
   directories:
     - $HOME/.cache/gams
 
-script:
-  - cd data && gams test.gms
-  - py.test gdx --cov=gdx
+script: py.test gdx --cov=gdx
 
 after_success:
   - coveralls

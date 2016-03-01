@@ -11,7 +11,10 @@ setup(name='PyGDX',
         'gdxcc >= 7',
         'xarray >= 0.4',
         ],
-      tests_require=['pytest'],
+      tests_require=[
+        'pytest',
+        'coveralls',
+        ],
       url='https://github.com/khaeru/py-gdx',
       packages=find_packages(),
       )
