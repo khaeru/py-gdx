@@ -28,8 +28,7 @@ __all__ = [
 class File(xr.Dataset):
     """Load the file at *filename* into memory.
 
-    *mode* must be 'r' (writing GDX files is not currently supported). If
-    *lazy* is ``True`` (default), then the data for GDX Parameters is not
+    If *lazy* is ``True`` (default), then the data for GDX Parameters is not
     loaded until each individual parameter is first accessed; otherwise all
     parameters except those listed in *skip* (default: empty) are loaded
     immediately.
@@ -38,6 +37,14 @@ class File(xr.Dataset):
     Parameter declared over '*' (the universal set), an implicit set is
     constructed, containing only the labels appearing in the respective
     dimension of that parameter.
+
+    .. note::
+
+       For instance, the GAMS Parameter ``foo(*,*,*)`` is loaded as
+       ``foo(_foo_0,_foo_1,_foo_2)``, where ``_foo_0`` is an implicit set that
+       contains only labels appearing along the first dimension of ``foo``,
+       etc. This workaround is essential for GDX files where ``*`` is large;
+       otherwise, loading ``foo`` as declared raises :py:class:`MemoryError`.
 
     """
     # For the benefit of xr.Dataset.__getattr__
@@ -355,7 +362,7 @@ class File(xr.Dataset):
 
     def dealias(self, name):
         """Identify the GDX Symbol that *name* refers to, and return the
-        corresponding :class:`xr.DataArray`."""
+        corresponding :py:class:`xarray.DataArray`."""
         return self[self._alias[name]] if name in self._alias else self[name]
 
     def extract(self, name):
@@ -366,9 +373,9 @@ class File(xr.Dataset):
         concatenation and merging, this carries along sub-Sets and other
         Coordinates which confound xarray.
 
-        :func:`extract()` returns a self-contained xr.DataArray with the
-        declared dimensions of the Symbol (and *only* those dimensions), which
-        does not make reference to the :class:`File`.
+        :func:`extract()` returns a self-contained :py:class:`xarray.DataArray`
+        with the declared dimensions of the Symbol (and *only* those
+        dimensions), which does not make reference to the :class:`File`.
         """
         # Copy the Symbol, triggering lazy-loading if needed
         result = self[name].copy()
@@ -402,7 +409,7 @@ class File(xr.Dataset):
         return result.drop(drop_coords)
 
     def info(self, name):
-        """Informal string representation of a Symbol."""
+        """Informal string representation of the Symbol with *name*."""
         if isinstance(self._state[name], dict):
             attrs = self._state[name]['attrs']
             return '{} {}({}) — {} records: {}'.format(
@@ -428,10 +435,10 @@ class File(xr.Dataset):
     def set(self, name):
         """Return the elements of GAMS Set *name*.
 
-        Because of the need to store non-null labels for each element of a
-        Coordinate, a GAMS sub-Set will contain some '' elements, corresponding
+        Because :py:mod:`xarray` stores non-null labels for each element of a
+        coord, a GAMS sub-Set will contain some ``''`` elements, corresponding
         to elements of the parent Set which do not appear in *name*.
-        :func:`set()` returns the elements, absent these placeholders.
+        :func:`set()` returns the elements without these placeholders.
 
         """
         return [k for k in self[name].to_index() if k != '']

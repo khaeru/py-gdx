@@ -1,2 +1,2 @@
 pandas>=0.15
-xray>=0.4
+xarray>=0.4
