@@ -10,19 +10,20 @@ python:
 env:
   - GAMS=24.4
     GAMS_URL=http://d37drm4t2jghv5.cloudfront.net/distributions/24.4.3/linux/linux_x64_64_sfx.exe
+    GAMS_API=api
 
 before_install:
-  - mkdir -p $HOME/.cache/gams/$GAMS
-  - wget -N $GAMS_URL -P $HOME/.cache/gams/$GAMS/
-  - unzip -q $HOME/.cache/gams/$GAMS/*.exe
+  - cd $HOME
+  - mkdir -p .cache/gams/$GAMS
+  - wget -N $GAMS_URL -P .cache/gams/$GAMS/
+  - unzip -q .cache/gams/$GAMS/*.exe
   - ln -s gams* gams
   - cd gams
   - ./gamsinst -a
-  - cd -
-  - export PATH=$HOME/gams:$PATH
-  - cd gams/apifiles/Python/api
+  - cd apifiles/Python/$GAMS_API
   - python gdxsetup.py install
-  - cd -
+  - export PATH=$HOME/gams:$PATH
+  - cd $TRAVIS_BUILD_DIR
 
 install:
   - pip install -r data/test-requirements.txt
