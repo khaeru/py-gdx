@@ -1,4 +1,0 @@
-coveralls
-pytest
-pytest-cov
-xarray

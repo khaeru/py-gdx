@@ -8,35 +8,43 @@ python:
   - "3.5"
 
 env:
-  - GAMS=24.4
-    GAMS_URL=http://d37drm4t2jghv5.cloudfront.net/distributions/24.4.3/linux/linux_x64_64_sfx.exe
-    GAMS_API=api
+  global:
+    - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh
+  matrix:
+    - GAMS=24.4
+      GAMS_URL=http://d37drm4t2jghv5.cloudfront.net/distributions/24.4.3/linux/linux_x64_64_sfx.exe
+      GAMS_API=api
 
 before_install:
+  # Install Miniconda
+  - wget -N $MINICONDA_URL -P $HOME/.cache/
+  - bash $HOME/.cache/Miniconda-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes --set changeps1 no
+  - conda update -q conda
+  - conda info -a
+  # Install GAMS
   - cd $HOME
-  - mkdir -p .cache/gams/$GAMS
   - wget -N $GAMS_URL -P .cache/gams/$GAMS/
   - unzip -q .cache/gams/$GAMS/*.exe
-  - ln -s gams* gams
-  - cd gams
+  - cd gams*
   - ./gamsinst -a
+  - export PATH="`pwd`:$PATH"
   - cd apifiles/Python/$GAMS_API
   - python gdxsetup.py install
-  - export PATH=$HOME/gams:$PATH
   - cd $TRAVIS_BUILD_DIR
 
 install:
-  - pip install -r data/test-requirements.txt
+  - conda env create --file data/test-requirements-$TRAVIS_PYTHON_VERSION.yml
+  - source activate test_env
   - python setup.py install
 
 cache:
-  pip: true
   directories:
-    - $HOME/.cache/gams
+    - $HOME/.cache
 
-script:
-  - gams data/tests.gms
-  - py.test gdx --cov=gdx
+script: py.test gdx --cov=gdx
 
 after_success:
   - coveralls

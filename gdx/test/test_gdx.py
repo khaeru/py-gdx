@@ -20,9 +20,9 @@ def rawgdx(request):
     os.chdir('data')
     args = ['gams', 'tests.gms']
     try:  # Python 3.5 and later
-        subprocess.run(args)  #, shell=True, env=os.environ)
+        subprocess.run(args)
     except AttributeError:  # Python 3.4 and earlier
-        subprocess.call(args)  #, shell=True, env=os.environ)
+        subprocess.call(args)
     os.remove('tests.lst')
     os.chdir('..')
 
