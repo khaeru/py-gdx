@@ -48,6 +48,7 @@ install:
 cache:
   directories:
     - $HOME/.cache
+    - $HOME/miniconda/pkgs/*.tar.bz2
 
 script: py.test gdx --cov=gdx
 
