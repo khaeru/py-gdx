@@ -18,6 +18,7 @@ before_install:
   - ln -s gams* gams
   - cd gams/apifiles/Python/api
   - python gdxsetup.py install
+  - cd -
   - export PATH=$HOME/gams:$PATH
 
 install: python setup.py install
