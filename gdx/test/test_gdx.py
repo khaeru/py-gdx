@@ -18,7 +18,11 @@ def rawgdx(request):
     import os
     import subprocess
     os.chdir('data')
-    subprocess.run(['gams', 'tests.gms'])
+    args = ['gams', 'tests.gms']
+    try:  # Python 3.5 and later
+        subprocess.run(args, shell=True)
+    except:  # Python 3.4 and earlier
+        subprocess.call(args, shell=True)
     os.remove('tests.lst')
     os.chdir('..')
 
