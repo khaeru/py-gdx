@@ -18,7 +18,7 @@ env:
 before_install:
   # Install Miniconda
   - wget -N $MINICONDA_URL -P $HOME/.cache/
-  - bash $HOME/.cache/Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
+  - bash $HOME/.cache/Miniconda3-latest-Linux-x86_64.sh -b -f -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
