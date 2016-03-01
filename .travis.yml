@@ -16,6 +16,9 @@ before_install:
   - wget -N $GAMS_URL -P $HOME/.cache/gams/$GAMS/
   - unzip $HOME/.cache/gams/$GAMS/*.exe
   - ln -s gams* gams
+  - cd gams
+  - ./gamsinst -a
+  - cd -
   - cd gams/apifiles/Python/api
   - python gdxsetup.py install
   - cd -
