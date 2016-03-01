@@ -1,11 +1,47 @@
 from collections import OrderedDict
-from unittest import TestCase
+
+import pytest
 
 import numpy as np
 import gdx
 
 
-URI = 'data/tests.gdx'
+@pytest.fixture(scope='session')
+def rawgdx(request):
+    """ Return the path to a GDX file for running tests.
+
+    Invoking this fixture causes the file data/tests.gms to be processed to
+    data/tests.gdx. When the fixture is finalized (torn down), the GDX file
+    is deleted.
+
+    """
+    import os
+    import subprocess
+    os.chdir('data')
+    args = ['gams', 'tests.gms']
+    try:  # Python 3.5 and later
+        subprocess.run(args)
+    except AttributeError:  # Python 3.4 and earlier
+        subprocess.call(args)
+    os.remove('tests.lst')
+    os.chdir('..')
+
+    def finalize():
+        os.remove('data/tests.gdx')
+    request.addfinalizer(finalize)
+    return 'data/tests.gdx'
+
+
+@pytest.fixture(scope='class')
+def gdxfile(rawgdx):
+    """A gdx.File fixture."""
+    return gdx.File(rawgdx)
+
+
+@pytest.fixture(scope='class')
+def gdxfile_implicit(rawgdx):
+    """A gdx.File fixture, instantiated with implicit=False."""
+    return gdx.File(rawgdx, implicit=False)
 
 
 actual = OrderedDict([
@@ -36,99 +72,83 @@ def list_cmp(l1, l2):
     return all([i1 == i2 for i1, i2 in zip(l1, l2)])
 
 
-class TestGDX:
-    def test_init(self):
-        gdx.GDX()
+def test_gdx():
+    gdx.GDX()
 
 
-class TestFile(TestCase):
-    def setUp(self):
-        self.f = gdx.File(URI)
-
-    def test_init(self):
-        gdx.File(URI)
-        with self.assertRaises(FileNotFoundError):
+class TestFile:
+    def test_init(self, rawgdx):
+        gdx.File(rawgdx)
+        with pytest.raises(FileNotFoundError):
             gdx.File('nonexistent.gdx')
 
-    def test_parameters(self):
-        params = self.f.parameters()
+    def test_parameters(self, gdxfile):
+        params = gdxfile.parameters()
         assert len(params) == actual_info['N parameters']
 
-    def test_sets(self):
-        sets = self.f.sets()
+    def test_sets(self, gdxfile):
+        sets = gdxfile.sets()
         assert len(sets) == actual_info['N sets'] + 1
 
-    def test_get_symbol(self):
-        self.f['s']
+    def test_get_symbol(self, gdxfile):
+        gdxfile['s']
 
-    def test_get_symbol_by_index(self):
+    def test_get_symbol_by_index(self, gdxfile):
         for i, name in enumerate(actual.keys()):
-            sym = self.f.get_symbol_by_index(i)
+            sym = gdxfile.get_symbol_by_index(i)
             assert sym.name == name
         # Giving too high an index results in IndexError
-        with self.assertRaises(IndexError):
-            self.f.get_symbol_by_index(i + 1)
+        with pytest.raises(IndexError):
+            gdxfile.get_symbol_by_index(i + 1)
 
-    def test_getattr(self):
+    def test_getattr(self, gdxfile):
         for name in actual.keys():
-            getattr(self.f, name)
-        with self.assertRaises(AttributeError):
-            self.f.notasymbolname
+            getattr(gdxfile, name)
+        with pytest.raises(AttributeError):
+            gdxfile.notasymbolname
 
-    def test_getitem(self):
+    def test_getitem(self, gdxfile):
         for name in actual.keys():
-            self.f[name]
-        with self.assertRaises(KeyError):
-            self.f['notasymbolname']
+            gdxfile[name]
+        with pytest.raises(KeyError):
+            gdxfile['notasymbolname']
 
-    def test_extract(self):
+    def test_extract(self, gdxfile):
         for name in ['p1', 'p2', 'p3', 'p4']:
-            self.f.extract(name)
-        with self.assertRaises(KeyError):
-            self.f.extract('notasymbolname')
+            gdxfile.extract(name)
+        with pytest.raises(KeyError):
+            gdxfile.extract('notasymbolname')
 
-    def test_implicit(self):
-        assert self.f['p5'].shape == (3, 3)
-
-
-class TestImplicit(TestCase):
-    def setUp(self):
-        self.f = gdx.File(URI, implicit=False)
-
-    def test_implicit(self):
-        N = len(self.f['*'])
-        assert self.f['p5'].shape == (N, N)
+    def test_implicit(self, gdxfile):
+        assert gdxfile['p5'].shape == (3, 3)
 
 
-class TestSymbol:
-    pass
+def test_implicit(gdxfile_implicit):
+    N = len(gdxfile_implicit['*'])
+    assert gdxfile_implicit['p5'].shape == (N, N)
 
 
-class TestSet(TestCase):
-    def setUp(self):
-        self.file = gdx.File(URI)
-        self.star = self.file['*']
+class TestSet:
+    def test_len(self, gdxfile):
+        assert len(gdxfile.s) == len(actual['s'])
+        assert len(gdxfile.set('s1')) == len(actual['s1'])
+        assert len(gdxfile.set('s2')) == len(actual['s2'])
 
-    def test_len(self):
-        assert len(self.file.s) == len(actual['s'])
-        assert len(self.file.set('s1')) == len(actual['s1'])
-        assert len(self.file.set('s2')) == len(actual['s2'])
+    def test_getitem(self, gdxfile):
+        for i in range(len(gdxfile.s)):
+            gdxfile.s[i]
+        with pytest.raises(IndexError):
+            gdxfile.s[i + 1]
 
-    def test_getitem(self):
-        for i in range(len(self.file.s)):
-            self.file.s[i]
-        with self.assertRaises(IndexError):
-            self.file.s[i + 1]
+    def test_index(self, gdxfile):
+            assert np.argwhere(gdxfile.s.values == 'd') == 3
 
-    def test_index(self):
-            assert np.argwhere(self.file.s.values == 'd') == 3
-
-    def test_iter(self):
-        for i, elem in enumerate(self.file.s):
+    def test_iter(self, gdxfile):
+        for i, elem in enumerate(gdxfile.s):
             assert actual['s'][i] == elem
 
-    def test_domain(self):
-        def domain(name): return self.file[name].attrs['_gdx_domain']
+    def test_domain(self, gdxfile):
+        def domain(name): return gdxfile[name].attrs['_gdx_domain']
         assert list_cmp(domain('s'), ['*'])
         assert list_cmp(domain('t'), ['*'])
         assert list_cmp(domain('u'), ['*'])

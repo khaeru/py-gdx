@@ -1,5 +1,8 @@
+# Python temporary files
 *.egg-info/
 *.pyc
 __pycache__
+
+# Test-related files
+.coverage
 data/*.gdx
-data/*.lst
