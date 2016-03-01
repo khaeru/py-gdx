@@ -21,7 +21,9 @@ before_install:
   - cd -
   - export PATH=$HOME/gams:$PATH
 
-install: python setup.py install
+install:
+  - pip install -r data/test-requirements.txt
+  - python setup.py install
 
 cache:
   pip: true
