@@ -77,7 +77,7 @@ The **universal Set**, ``*``, contains every element appearing in any Set in the
      parameter new(*)  'More data';
      new('L') = 3;
 
-  This would add ``L`` to the universal set.
+  This would add ``L`` to the universal Set.
 
 The **descriptive text** provided on declaration of Symbols or Set elements is stored in GDX files along with the data contained in those variables.
 

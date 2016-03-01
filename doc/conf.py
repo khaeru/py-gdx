@@ -57,7 +57,6 @@ sys.path.insert(0, os.path.abspath('../'))
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.intersphinx',
-    'sphinx.ext.todo',
     'sphinx.ext.coverage',
     ]
 
@@ -72,7 +71,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'pyGDX'
-copyright = u'2012–2015, Paul Natsuo Kishimoto'
+copyright = u'2012–2016, Paul Natsuo Kishimoto'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -160,7 +159,5 @@ texinfo_documents = [
 intersphinx_mapping = {
   'python': ('http://docs.python.org/3', None),
   'pandas': ('http://pandas.pydata.org/pandas-docs/stable/', None),
-  'xray': ('http://xray.readthedocs.org/en/stable/', None),
+  'xr': ('http://xarray.pydata.org/en/stable/', None),
   }
-
-todo_include_todos = True
