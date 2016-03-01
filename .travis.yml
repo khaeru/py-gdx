@@ -33,7 +33,9 @@ cache:
   directories:
     - $HOME/.cache/gams
 
-script: py.test gdx --cov=gdx
+script:
+  - gams data/tests.gms
+  - py.test gdx --cov=gdx
 
 after_success:
   - coveralls
