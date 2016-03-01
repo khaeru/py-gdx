@@ -14,15 +14,15 @@ env:
 before_install:
   - mkdir -p $HOME/.cache/gams/$GAMS
   - wget -N $GAMS_URL -P $HOME/.cache/gams/$GAMS/
-  - unzip $HOME/.cache/gams/$GAMS/*.exe
+  - unzip -q $HOME/.cache/gams/$GAMS/*.exe
   - ln -s gams* gams
   - cd gams
   - ./gamsinst -a
   - cd -
+  - export PATH=$HOME/gams:$PATH
   - cd gams/apifiles/Python/api
   - python gdxsetup.py install
   - cd -
-  - export PATH=$HOME/gams:$PATH
 
 install:
   - pip install -r data/test-requirements.txt
