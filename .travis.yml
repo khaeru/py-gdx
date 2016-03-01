@@ -25,13 +25,14 @@ before_install:
   - conda update -q conda
   - conda info -a
   # Install GAMS
-  - cd $HOME
+  - pushd $HOME
   - wget -N $GAMS_URL -P .cache/gams/$GAMS/
   - unzip -q .cache/gams/$GAMS/*.exe
   - cd gams*
   - ./gamsinst -a
   - export PATH="`pwd`:$PATH"
   - export GAMS_API_PATH=`readlink -f apifiles/Python/$GAMS_API`
+  - popd
 
 install:
   # Prepare the Anaconda environment
