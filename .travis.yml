@@ -10,12 +10,13 @@ env:
     - GAMS_URL=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
 
 matrix:
-  - python: "2.7"
-    env: GAMS_API=api_27
-  - python: "3.4"
-    env: GAMS_API=api_34
-  - python: "3.5"
-    env: GAMS_API=api_34
+  include:
+    - python: "2.7"
+      env: GAMS_API=api_26
+    - python: "3.4"
+      env: GAMS_API=api_34
+    - python: "3.5"
+      env: GAMS_API=api_34
 
 before_install:
   # Install Miniconda
