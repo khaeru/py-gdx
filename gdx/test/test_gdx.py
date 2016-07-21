@@ -3,7 +3,6 @@ from collections import OrderedDict
 import pytest
 
 import numpy as np
-import gdx
 
 
 @pytest.fixture(scope='session')
@@ -35,12 +34,14 @@ def rawgdx(request):
 @pytest.fixture(scope='class')
 def gdxfile(rawgdx):
     """A gdx.File fixture."""
+    import gdx
     return gdx.File(rawgdx)
 
 
 @pytest.fixture(scope='class')
 def gdxfile_implicit(rawgdx):
     """A gdx.File fixture, instantiated with implicit=False."""
+    import gdx
     return gdx.File(rawgdx, implicit=False)
 
 
@@ -73,11 +74,13 @@ def list_cmp(l1, l2):
 
 
 def test_gdx():
+    import gdx
     gdx.GDX()
 
 
 class TestFile:
     def test_init(self, rawgdx):
+        import gdx
         gdx.File(rawgdx)
         with pytest.raises(FileNotFoundError):
             gdx.File('nonexistent.gdx')
