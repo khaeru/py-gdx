@@ -1,21 +1,28 @@
-from __future__ import unicode_literals
-from __future__ import print_function
-from __future__ import division
-from __future__ import absolute_import
-from future import standard_library
-standard_library.install_aliases()
-from builtins import object
+# coding: utf-8
+from __future__ import absolute_import, division, print_function, \
+    unicode_literals
 from os.path import dirname
-try:
+import sys
+
+PY3 = sys.version_info[0] >= 3
+
+if PY3:
     from shutil import which
-except ImportError:
+else:
     from backports.shutil_which import which
+    from builtins import object
+    from future import standard_library
+    standard_library.install_aliases()
+
+    class FileNotFoundError(OSError):
+        pass
 
 import gdxcc
 
 
 __all__ = [
     'GDX',
+    'gdxcc',
     'type_str',
     'vartype_str',
     ]

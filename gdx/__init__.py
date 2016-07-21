@@ -1,30 +1,25 @@
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import division
-from __future__ import absolute_import
-from builtins import filter
-from builtins import range
-from builtins import super
-from builtins import zip
-from future import standard_library
-standard_library.install_aliases()
+# coding: utf-8
+from __future__ import absolute_import, division, print_function, \
+    unicode_literals
 from itertools import cycle
-
-import numpy
-import pandas
-try:
-    import xarray as xr
-except ImportError:
-    import xray as xr
-
-import gdxcc
-
-from .api import type_str, vartype_str, GDX
-
 from logging import debug, info
 # commented: for debugging
 # import logging
 # logging.basicConfig(level=logging.DEBUG)
+import sys
+
+import numpy
+import pandas
+import xarray as xr
+
+PY3 = sys.version_info[0] >= 3
+
+if not PY3:
+    from builtins import filter, range, super, zip
+    from future import standard_library
+    standard_library.install_aliases()
+
+from .api import GDX, gdxcc, type_str, vartype_str
 
 
 __version__ = '2'
