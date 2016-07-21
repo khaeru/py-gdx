@@ -8,7 +8,9 @@ setup(name='PyGDX',
       author_email='mail@paul.kishimoto.name',
       description='GAMS Data Exchange (GDX) file access',
       install_requires=[
+        'backports.shutil_which',
         'gdxcc >= 7',
+        'future',
         'xarray >= 0.4',
         ],
       tests_require=[

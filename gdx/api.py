@@ -6,7 +6,10 @@ from future import standard_library
 standard_library.install_aliases()
 from builtins import object
 from os.path import dirname
-from shutil import which
+try:
+    from shutil import which
+except ImportError:
+    from backports.shutil_which import which
 
 import gdxcc
 
