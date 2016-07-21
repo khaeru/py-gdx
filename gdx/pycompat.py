@@ -8,7 +8,7 @@ PY3 = sys.version_info[0] >= 3
 if PY3:
     from builtins import FileNotFoundError
     from shutil import which
-else:
+else:  # pragma: no cover
     class FileNotFoundError(OSError):
         pass
     from backports.shutil_which import which

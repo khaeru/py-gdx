@@ -3,6 +3,7 @@ from collections import OrderedDict
 import numpy as np
 import pytest
 
+import gdx
 from gdx.pycompat import FileNotFoundError
 
 
@@ -35,14 +36,12 @@ def rawgdx(request):
 @pytest.fixture(scope='class')
 def gdxfile(rawgdx):
     """A gdx.File fixture."""
-    import gdx
     return gdx.File(rawgdx)
 
 
 @pytest.fixture(scope='class')
 def gdxfile_implicit(rawgdx):
     """A gdx.File fixture, instantiated with implicit=False."""
-    import gdx
     return gdx.File(rawgdx, implicit=False)
 
 
@@ -57,6 +56,7 @@ actual = OrderedDict([
     ('s4', None),
     ('s5', ['b', 'd', 'f']),
     ('s6', ['b', 'd', 'f']),
+    ('s7', None),
     ('p1', None),
     ('p2', None),
     ('p3', None),
@@ -64,7 +64,7 @@ actual = OrderedDict([
     ('p5', None),
     ])
 actual_info = {
-    'N sets': 9,
+    'N sets': 12,
     'N parameters': 5,
     }
 actual_info['N symbols'] = sum(actual_info.values()) + 1
@@ -74,14 +74,20 @@ def list_cmp(l1, l2):
     return all([i1 == i2 for i1, i2 in zip(l1, l2)])
 
 
-def test_gdx():
-    import gdx
-    gdx.GDX()
+class TestAPI:
+    def test_gdx(self):
+        gdx.GDX()
+
+    def test_bad_method(self):
+        api = gdx.GDX()
+        with pytest.raises(NotImplementedError):
+            api.call('NotAMethod')
+        with pytest.raises(AttributeError):
+            api.not_a_method()
 
 
 class TestFile:
     def test_init(self, rawgdx):
-        import gdx
         gdx.File(rawgdx)
         with pytest.raises(FileNotFoundError):
             gdx.File('nonexistent.gdx')
@@ -103,7 +109,7 @@ class TestFile:
             assert sym.name == name
         # Giving too high an index results in IndexError
         with pytest.raises(IndexError):
-            gdxfile.get_symbol_by_index(i + 1)
+            gdxfile.get_symbol_by_index(gdxfile.attrs['symbol_count'] + 1)
 
     def test_getattr(self, gdxfile):
         for name in actual.keys():

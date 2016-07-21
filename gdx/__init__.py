@@ -416,7 +416,7 @@ class File(xr.Dataset):
                 attrs['type_str'], name, ','.join(attrs['domain']),
                 attrs['records'], attrs['description'])
         else:
-            print(self[name])
+            return repr(self[name])
 
     def _loaded_and_cached(self, type_code):
         """Return a list of loaded and not-loaded Symbols of *type_code*."""
