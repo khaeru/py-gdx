@@ -70,7 +70,7 @@ class File(xr.Dataset):
 
         # load the GDX API
         self._api = GDX()
-        self._api.open_read(filename)
+        self._api.open_read(str(filename))
 
         # Basic information about the GDX file
         v, p = self._api.file_version()

@@ -80,7 +80,7 @@ class GDX(object):
         """Constructor."""
         self._handle = gdxcc.new_gdxHandle_tp()
         self.error_count = 0
-        self.call('CreateD', _gams_dir(), gdxcc.GMS_SSSIZE)
+        self.call('CreateD', str(_gams_dir()), gdxcc.GMS_SSSIZE)
 
     def call(self, method, *args):
         """Invoke the GDX API method named gdx\ *Method*.
