@@ -1,3 +1,10 @@
+from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import division
+from __future__ import absolute_import
+from future import standard_library
+standard_library.install_aliases()
+from builtins import object
 from os.path import dirname
 from shutil import which
 
@@ -46,7 +53,7 @@ def _gams_dir():
     return dirname(which('gams'))
 
 
-class GDX:
+class GDX(object):
     """Wrapper around the `GDX API`_."""
     #: Methods that conform to the semantics of :func:`call`.
     __valid = [
