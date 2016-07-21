@@ -3,19 +3,11 @@ from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from os.path import dirname
 import sys
-from .pycompat import FileNotFoundError
-
-PY3 = sys.version_info[0] >= 3
-
-if PY3:
-    from shutil import which
-else:
-    from backports.shutil_which import which
-    from builtins import object
-    from future import standard_library
-    standard_library.install_aliases()
 
 import gdxcc
+
+from .pycompat import FileNotFoundError, install_aliases, object, which
+install_aliases()
 
 
 __all__ = [

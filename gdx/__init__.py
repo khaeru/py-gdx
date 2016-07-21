@@ -6,18 +6,13 @@ from logging import debug, info
 # commented: for debugging
 # import logging
 # logging.basicConfig(level=logging.DEBUG)
-import sys
 
 import numpy
 import pandas
 import xarray as xr
 
-PY3 = sys.version_info[0] >= 3
-
-if not PY3:
-    from builtins import filter, range, super, zip
-    from future import standard_library
-    standard_library.install_aliases()
+from .pycompat import install_aliases, filter, range, super, zip
+install_aliases()
 
 from .api import GDX, gdxcc, type_str, vartype_str
 
