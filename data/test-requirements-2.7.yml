@@ -1,10 +1,10 @@
 name: test_env
 dependencies:
   - python=2.7
-  - backports.shutil_which
   - future
   - pytest
   - xarray
   - pip:
+    - backports.shutil_which
     - coveralls
     - pytest-cov
