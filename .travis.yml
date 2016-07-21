@@ -4,9 +4,10 @@ notifications:
   email: false
 
 env:
-  - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-  - GAMS=24.7
-  - GAMS_URL=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
+  global:
+    - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+    - GAMS=24.7
+    - GAMS_URL=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
 
 matrix:
   - python: "2.7"
