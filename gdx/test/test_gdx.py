@@ -1,8 +1,9 @@
 from collections import OrderedDict
 
+import numpy as np
 import pytest
 
-import numpy as np
+from gdx.pycompat import FileNotFoundError
 
 
 @pytest.fixture(scope='session')

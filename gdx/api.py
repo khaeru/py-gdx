@@ -1,8 +1,9 @@
 # coding: utf-8
-from __future__ import absolute_import, division, print_function, \
-    unicode_literals
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 from os.path import dirname
 import sys
+from .pycompat import FileNotFoundError
 
 PY3 = sys.version_info[0] >= 3
 
@@ -13,9 +14,6 @@ else:
     from builtins import object
     from future import standard_library
     standard_library.install_aliases()
-
-    class FileNotFoundError(OSError):
-        pass
 
 import gdxcc
 
