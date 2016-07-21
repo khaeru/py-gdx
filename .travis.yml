@@ -3,21 +3,18 @@ sudo: false
 notifications:
   email: false
 
-python:
-  - "2.7"
-  - "3.4"
-  - "3.5"
-
 env:
-  global:
-    - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-  matrix:
-    - GAMS=24.4
-      GAMS_URL=http://d37drm4t2jghv5.cloudfront.net/distributions/24.4.3/linux/linux_x64_64_sfx.exe
-      GAMS_API=api
-    - GAMS=24.7
-      GAMS_URL=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
-      GAMS_API=api
+  - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
+  - GAMS=24.7
+  - GAMS_URL=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
+
+matrix:
+  - python: "2.7"
+    GAMS_API=api_27
+  - python: "3.4"
+    GAMS_API=api_34
+  - python: "3.5"
+    GAMS_API=api_34
 
 before_install:
   # Install Miniconda
@@ -44,7 +41,7 @@ install:
   - source activate test_env
   # Install the GAMS GDX Python API into the environment
   - cd $GAMS_API_PATH
-  - python gdxsetup.py install
+  - python setup.py install
   - cd -
   # Install PyGDX
   - python setup.py install
