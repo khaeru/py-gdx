@@ -10,11 +10,11 @@ env:
 
 matrix:
   - python: "2.7"
-    GAMS_API=api_27
+    env: GAMS_API=api_27
   - python: "3.4"
-    GAMS_API=api_34
+    env: GAMS_API=api_34
   - python: "3.5"
-    GAMS_API=api_34
+    env: GAMS_API=api_34
 
 before_install:
   # Install Miniconda
