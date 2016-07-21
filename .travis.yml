@@ -16,7 +16,7 @@ env:
       GAMS_URL=http://d37drm4t2jghv5.cloudfront.net/distributions/24.4.3/linux/linux_x64_64_sfx.exe
       GAMS_API=api
     - GAMS=24.7
-      GAMS_URI=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
+      GAMS_URL=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
       GAMS_API=api
 
 before_install:
