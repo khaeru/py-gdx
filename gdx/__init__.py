@@ -115,8 +115,8 @@ class File(xr.Dataset):
             vartype_str_ = ''
         attrs['type_str'] = '{} {}'.format(vartype_str_, type_str_)
 
-        debug('Loading #{index} {name}: {dim}-D, {records} records, '
-              '"{description}"'.format(**attrs))
+        debug(str('Loading #{index} {name}: {dim}-D, {records} records, '
+                  u'"{description}"').format(**attrs))
 
         # Equations and Aliases require limited processing
         if type_code == gdxcc.GMS_DT_EQU:
