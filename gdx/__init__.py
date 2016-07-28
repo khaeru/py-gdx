@@ -56,7 +56,7 @@ class File(xr.Dataset):
 
     def __init__(self, filename='', lazy=True, implicit=True, skip=set()):
         """Constructor."""
-        super().__init__()  # Invoke Dataset constructor
+        super(File, self).__init__()  # Invoke Dataset constructor
 
         # load the GDX API
         self._api = GDX()
@@ -131,7 +131,7 @@ class File(xr.Dataset):
                 # Duplicate the variable
                 self._variables[name] = self._variables[parent]
                 self._state[name] = True
-                super().set_coords(name, inplace=True)
+                super(File, self).set_coords(name, inplace=True)
             else:
                 raise NotImplementedError('Cannot handle aliases of symbols '
                                           'except GMS_DT_SET: {} {} not loaded'
@@ -302,7 +302,8 @@ class File(xr.Dataset):
         kwargs = {}  # Arguments to xr.Dataset.__setitem__()
         if dim == 0:
             # 0-D Variable or scalar Parameter
-            super().__setitem__(name, ([], data.popitem()[1], gdx_attrs))
+            super(File, self).__setitem__(name, ([], data.popitem()[1],
+                                                 gdx_attrs))
             return
         elif attrs['type_code'] == gdxcc.GMS_DT_SET:  # GAMS Set
             if dim == 1:
@@ -339,8 +340,9 @@ class File(xr.Dataset):
 
             # Create an empty xr.DataArray; this ensures that the data
             # read in below has the proper form and indices
-            super().__setitem__(name, (dims, self._empty(*domain, **kwargs),
-                                gdx_attrs))
+            super(File, self).__setitem__(name, (dims, self._empty(*domain,
+                                                                   **kwargs),
+                                                 gdx_attrs))
 
             # Fill in extra keys
             longest = numpy.argmax(self[name].values.shape)
@@ -459,11 +461,11 @@ class File(xr.Dataset):
     def __getitem__(self, key):
         """Set element access."""
         try:
-            return super().__getitem__(key)
+            return super(File, self).__getitem__(key)
         except KeyError:
             if isinstance(self._state[key], dict):
                 debug('Lazy-loading {}'.format(key))
                 self._load_symbol_data(key)
-                return super().__getitem__(key)
+                return super(File, self).__getitem__(key)
             else:
                 raise
