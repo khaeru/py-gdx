@@ -1,20 +1,20 @@
+# coding: utf-8
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 from itertools import cycle
-
-import numpy
-import pandas
-try:
-    import xarray as xr
-except ImportError:
-    import xray as xr
-
-import gdxcc
-
-from .api import type_str, vartype_str, GDX
-
 from logging import debug, info
 # commented: for debugging
 # import logging
 # logging.basicConfig(level=logging.DEBUG)
+
+import numpy
+import pandas
+import xarray as xr
+
+from .pycompat import install_aliases, filter, range, super, zip
+install_aliases()
+
+from .api import GDX, gdxcc, type_str, vartype_str
 
 
 __version__ = '2'
@@ -56,11 +56,11 @@ class File(xr.Dataset):
 
     def __init__(self, filename='', lazy=True, implicit=True, skip=set()):
         """Constructor."""
-        super().__init__()  # Invoke Dataset constructor
+        super(File, self).__init__()  # Invoke Dataset constructor
 
         # load the GDX API
         self._api = GDX()
-        self._api.open_read(filename)
+        self._api.open_read(str(filename))
 
         # Basic information about the GDX file
         v, p = self._api.file_version()
@@ -115,8 +115,8 @@ class File(xr.Dataset):
             vartype_str_ = ''
         attrs['type_str'] = '{} {}'.format(vartype_str_, type_str_)
 
-        debug('Loading #{index} {name}: {dim}-D, {records} records, '
-              '"{description}"'.format(**attrs))
+        debug(str('Loading #{index} {name}: {dim}-D, {records} records, '
+                  u'"{description}"').format(**attrs))
 
         # Equations and Aliases require limited processing
         if type_code == gdxcc.GMS_DT_EQU:
@@ -131,7 +131,7 @@ class File(xr.Dataset):
                 # Duplicate the variable
                 self._variables[name] = self._variables[parent]
                 self._state[name] = True
-                super().set_coords(name, inplace=True)
+                super(File, self).set_coords(name, inplace=True)
             else:
                 raise NotImplementedError('Cannot handle aliases of symbols '
                                           'except GMS_DT_SET: {} {} not loaded'
@@ -302,7 +302,8 @@ class File(xr.Dataset):
         kwargs = {}  # Arguments to xr.Dataset.__setitem__()
         if dim == 0:
             # 0-D Variable or scalar Parameter
-            super().__setitem__(name, ([], data.popitem()[1], gdx_attrs))
+            super(File, self).__setitem__(name, ([], data.popitem()[1],
+                                                 gdx_attrs))
             return
         elif attrs['type_code'] == gdxcc.GMS_DT_SET:  # GAMS Set
             if dim == 1:
@@ -339,8 +340,9 @@ class File(xr.Dataset):
 
             # Create an empty xr.DataArray; this ensures that the data
             # read in below has the proper form and indices
-            super().__setitem__(name, (dims, self._empty(*domain, **kwargs),
-                                gdx_attrs))
+            super(File, self).__setitem__(name, (dims, self._empty(*domain,
+                                                                   **kwargs),
+                                                 gdx_attrs))
 
             # Fill in extra keys
             longest = numpy.argmax(self[name].values.shape)
@@ -416,7 +418,7 @@ class File(xr.Dataset):
                 attrs['type_str'], name, ','.join(attrs['domain']),
                 attrs['records'], attrs['description'])
         else:
-            print(self[name])
+            return repr(self[name])
 
     def _loaded_and_cached(self, type_code):
         """Return a list of loaded and not-loaded Symbols of *type_code*."""
@@ -459,11 +461,11 @@ class File(xr.Dataset):
     def __getitem__(self, key):
         """Set element access."""
         try:
-            return super().__getitem__(key)
+            return super(File, self).__getitem__(key)
         except KeyError:
             if isinstance(self._state[key], dict):
                 debug('Lazy-loading {}'.format(key))
                 self._load_symbol_data(key)
-                return super().__getitem__(key)
+                return super(File, self).__getitem__(key)
             else:
                 raise

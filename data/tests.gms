@@ -34,6 +34,7 @@ sets
   s4(s,t,u)  'Three-dimensional set'        / a.set.t.set.u no /
   s5         'Set with unspecified parent'  / b, d, f /
   s6(*)      'Set under the universal set'  / b, d, f /
+  s7(s,s)    'Set for testing sameas()'     / /
   ;
 
 parameters
@@ -50,5 +51,8 @@ parameter p5(*,*) 'Parameter defined over the universal set' /
   /;
 
 p1('a') = 1;
+
+alias (s, s_);
+s7(s,s_)$sameas(s, s_) = yes;
 
 execute_unload 'tests.gdx'

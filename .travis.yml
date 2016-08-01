@@ -4,16 +4,16 @@ notifications:
   email: false
 
 python:
+  - "2.7"
   - "3.4"
   - "3.5"
 
 env:
   global:
     - MINICONDA_URL=http://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
-  matrix:
-    - GAMS=24.4
-      GAMS_URL=http://d37drm4t2jghv5.cloudfront.net/distributions/24.4.3/linux/linux_x64_64_sfx.exe
-      GAMS_API=api
+    - GAMS=24.7
+    - GAMS_URL=https://d37drm4t2jghv5.cloudfront.net/distributions/24.7.3/linux/linux_x64_64_sfx.exe
+    - GAMS_API=api
 
 before_install:
   # Install Miniconda

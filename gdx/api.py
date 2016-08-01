@@ -1,11 +1,18 @@
+# coding: utf-8
+from __future__ import (absolute_import, division, print_function,
+                        unicode_literals)
 from os.path import dirname
-from shutil import which
+import sys
 
 import gdxcc
+
+from .pycompat import FileNotFoundError, install_aliases, object, which
+install_aliases()
 
 
 __all__ = [
     'GDX',
+    'gdxcc',
     'type_str',
     'vartype_str',
     ]
@@ -46,7 +53,7 @@ def _gams_dir():
     return dirname(which('gams'))
 
 
-class GDX:
+class GDX(object):
     """Wrapper around the `GDX API`_."""
     #: Methods that conform to the semantics of :func:`call`.
     __valid = [
@@ -70,7 +77,7 @@ class GDX:
         """Constructor."""
         self._handle = gdxcc.new_gdxHandle_tp()
         self.error_count = 0
-        self.call('CreateD', _gams_dir(), gdxcc.GMS_SSSIZE)
+        self.call('CreateD', str(_gams_dir()), gdxcc.GMS_SSSIZE)
 
     def call(self, method, *args):
         """Invoke the GDX API method named gdx\ *Method*.
