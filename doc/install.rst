@@ -15,9 +15,9 @@ Linux, Mac OS X
 
 .. note:
 
-   It is fairly painless to install either 'plain' Python or Anaconda on each of Linux and Mac OS X. If you are using Anaconda, be sure to activate an appropriate environment configured with Python 3 before continuing, and remember that you will need to install pyGDX in each new environment where you want to use it.
+   It is fairly painless to install either 'plain' Python or Anaconda on each of Linux and Mac OS X. If you are using Anaconda, be sure to activate an before continuing, and remember that you will need to install both the GAMS GDX API *and* pyGDX in each new environment where you want to use it.
 
-2. Navigate to the GAMS Python API directory. If gams is installed at (for instance) */opt/gams*, this will be */opt/gams/apifiles/Python/api_34*.
+2. Navigate to the GAMS Python API directory. If gams is installed at (for instance) */opt/gams*, this will be */opt/gams/apifiles/Python/api_34* (Python 3.4+, on Linux) or */opt/gams/apifiles/Python/api* (Python 2.7, on Mac OS X).
 
 3. Run either ``python setup.py install`` (to install all the GAMS bindings) or ``python gdxsetup.py install`` (to install only the GDX bindings needed by pyGDX).
 
@@ -41,7 +41,7 @@ Windows
 Steps 4 and 5 may be repeated for any new Anaconda environment in which pyGDX is needed.
 
 
-.. [#] This is necessary because GAMS only ships bindings for Python 3.4, and not the newest Python 3.5. Unlike on Mac OS and Linux, the Python 3.4 bindings do not work with Python 3.5.
+.. [#] This is necessary because GAMS only ships bindings for Python 3.4, and not the newest Python 3.5. Unlike on Linux, the Python 3.4 bindings do not work with Python 3.5.
 .. [#] The Anaconda documentation `recommends`_ adding packages when creating the environment, if possible, instead of installing them later.
 .. _`GAMS`: https:\\www.gams.com\download\
 .. _`Anaconda`: https:\\www.continuum.io\downloads#_windows
