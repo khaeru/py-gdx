@@ -4,9 +4,9 @@ notifications:
   email: false
 
 python:
-  - "2.7"
-  - "3.4"
-  - "3.5"
+  - 2.7
+  - 3.4
+  - 3.5
 
 env:
   global:
@@ -17,40 +17,35 @@ env:
 
 before_install:
   # Install Miniconda
-  - wget -N $MINICONDA_URL -P $HOME/.cache/
-  - bash $HOME/.cache/Miniconda3-latest-Linux-x86_64.sh -b -f -p $HOME/miniconda
+  - wget -N $MINICONDA_URL -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
   - export PATH="$HOME/miniconda/bin:$PATH"
   - hash -r
   - conda config --set always_yes yes --set changeps1 no
   - conda update -q conda
   - conda info -a
   # Install GAMS
-  - pushd $HOME
-  - wget -N $GAMS_URL -P .cache/gams/$GAMS/
-  - unzip -q .cache/gams/$GAMS/*.exe
-  - cd gams*
-  - ./gamsinst -a
-  - export PATH="`pwd`:$PATH"
-  - export GAMS_API_PATH=`readlink -f apifiles/Python/$GAMS_API`
-  - popd
+  - wget -N $GAMS_URL -O gams.zip
+  - unzip -qu gams.zip -d $HOME
+  - ln -s $HOME/gams${GAMS}_linux_x64_64_sfx $HOME/gams
+  - export PATH="$HOME/gams:$PATH"
+  - cd $HOME/gams
+  - gamsinst -a
+  - cd -
 
 install:
   # Prepare the Anaconda environment
   - conda env create --file data/test-requirements-$TRAVIS_PYTHON_VERSION.yml
   - source activate test_env
   # Install the GAMS GDX Python API into the environment
-  - cd $GAMS_API_PATH
+  - cd $HOME/gams/apifiles/Python/$GAMS_API
   - python gdxsetup.py install
   - cd -
   # Install PyGDX
   - python setup.py install
 
-cache:
-  directories:
-    - $HOME/.cache
-    - $HOME/miniconda/pkgs/*.tar.bz2
-
-script: py.test gdx --cov=gdx
+script:
+    - py.test gdx --cov=gdx --cov-report term-missing
 
 after_success:
   - coveralls

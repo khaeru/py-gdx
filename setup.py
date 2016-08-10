@@ -9,15 +9,10 @@ setup(name='PyGDX',
       description='GAMS Data Exchange (GDX) file access',
       install_requires=[
         'backports.shutil_which',
-        'gdxcc >= 7',
         'future',
-        'xarray >= 0.4',
+        'xarray',
         ],
-      tests_require=[
-        'coveralls',
-        'pytest',
-        'pytest-cov',
-        ],
+      tests_require=['pytest'],
       url='https://github.com/khaeru/py-gdx',
       packages=find_packages(),
       )
