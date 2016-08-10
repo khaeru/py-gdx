@@ -1,5 +1,7 @@
 $onempty
 
+scalar  pi  'Circumference divided by diameter'  / 3.14 /;
+
 set  s  'Example set of animals'  /
   a  Aardvark
   b  'Blue whale'
@@ -38,17 +40,23 @@ sets
   ;
 
 parameters
-  p1(s)    'Example parameter with animal data'  / /
-  p2(t)    'Example parameter with color data'   / set.t 0 /
-  p3(s,t)  'Two-dimensional parameter'           / set.s.y 1 /
-  p4(s1)   'Parameter defined over a subset'     / set.s1 1 /
+  p1(s)    'Example parameter with animal data'              / /
+  p2(t)    'Example parameter with color data'               / set.t 0 /
+  p3(s,t)  'Two-dimensional parameter'                       / set.s.y 1 /
+  p4(s1)   'Parameter defined over a subset'                 / set.s1 1 /
+  p5(*)    'Empty parameter defined over the universal set'
   ;
 
-parameter p5(*,*) 'Parameter defined over the universal set' /
+parameter p6(*,*) 'Parameter defined over the universal set' /
   a.o   1
   r.US  2
   CA.b  3
   /;
+
+equation  e1;
+variables v1, v2;
+
+e1.. v1 =e= v2;
 
 p1('a') = 1;
 

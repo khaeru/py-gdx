@@ -40,13 +40,14 @@ def gdxfile(rawgdx):
 
 
 @pytest.fixture(scope='class')
-def gdxfile_implicit(rawgdx):
+def gdxfile_explicit(rawgdx):
     """A gdx.File fixture, instantiated with implicit=False."""
     return gdx.File(rawgdx, implicit=False)
 
 
 actual = OrderedDict([
     ('*', None),
+    ('pi', 3.14),
     ('s', ['a', 'b', 'c', 'd', 'e', 'f', 'g']),
     ('t', ['r', 'o', 'y', 'g', 'b', 'i', 'v']),
     ('u', ['CA', 'US', 'CN', 'JP']),
@@ -62,10 +63,11 @@ actual = OrderedDict([
     ('p3', None),
     ('p4', None),
     ('p5', None),
+    ('p6', None),
     ])
 actual_info = {
     'N sets': 12,
-    'N parameters': 5,
+    'N parameters': 7,
     }
 actual_info['N symbols'] = sum(actual_info.values()) + 1
 
@@ -89,6 +91,7 @@ class TestAPI:
 class TestFile:
     def test_init(self, rawgdx):
         gdx.File(rawgdx)
+        gdx.File(rawgdx, lazy=False)
         with pytest.raises(FileNotFoundError):
             gdx.File('nonexistent.gdx')
 
@@ -98,7 +101,7 @@ class TestFile:
 
     def test_sets(self, gdxfile):
         sets = gdxfile.sets()
-        assert len(sets) == actual_info['N sets'] + 1
+        assert len(sets) == actual_info['N sets']
 
     def test_get_symbol(self, gdxfile):
         gdxfile['s']
@@ -122,20 +125,34 @@ class TestFile:
             gdxfile[name]
         with pytest.raises(KeyError):
             gdxfile['notasymbolname']
+        with pytest.raises(KeyError):
+            gdxfile['e1']
 
-    def test_extract(self, gdxfile):
+    def test_info1(self, gdxfile):
+        assert gdxfile.info('s1').startswith("<xarray.DataArray 's1' (s: 7)>")
+
+    def test_info2(self, rawgdx):
+        # Use a File where p1 is guaranteed to not have been loaded:
+        assert (gdx.File(rawgdx).info('p1') == 'unknown parameter p1(s) — 1 '
+                'records: Example parameter with animal data')
+
+    def test_dealias(self, gdxfile):
+        assert gdxfile.dealias('s_').equals(gdxfile['s'])
+
+    def test_extract(self, gdxfile, gdxfile_explicit):
         for name in ['p1', 'p2', 'p3', 'p4']:
             gdxfile.extract(name)
+        gdxfile_explicit.extract('p5')
         with pytest.raises(KeyError):
             gdxfile.extract('notasymbolname')
 
     def test_implicit(self, gdxfile):
-        assert gdxfile['p5'].shape == (3, 3)
+        assert gdxfile['p6'].shape == (3, 3)
 
 
-def test_implicit(gdxfile_implicit):
-    N = len(gdxfile_implicit['*'])
-    assert gdxfile_implicit['p5'].shape == (N, N)
+def test_implicit(gdxfile_explicit):
+    N = len(gdxfile_explicit['*'])
+    assert gdxfile_explicit['p6'].shape == (N, N)
 
 
 class TestSet:

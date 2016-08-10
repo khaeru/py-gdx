@@ -111,7 +111,9 @@ class File(xr.Dataset):
             type_str_ = 'scalar'
         try:
             vartype_str_ = vartype_str[vartype]
-        except KeyError:
+        except KeyError:  # pragma: no cover
+            # Some other vartype is returned that's not described by the GDX
+            # API docs
             vartype_str_ = ''
         attrs['type_str'] = '{} {}'.format(vartype_str_, type_str_)
 
@@ -127,15 +129,11 @@ class File(xr.Dataset):
         elif type_code == gdxcc.GMS_DT_ALIAS:
             parent = desc.replace('Aliased with ', '')
             self._alias[name] = parent
-            if self[parent].attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET:
-                # Duplicate the variable
-                self._variables[name] = self._variables[parent]
-                self._state[name] = True
-                super(File, self).set_coords(name, inplace=True)
-            else:
-                raise NotImplementedError('Cannot handle aliases of symbols '
-                                          'except GMS_DT_SET: {} {} not loaded'
-                                          .format(index, name))
+            assert self[parent].attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET
+            # Duplicate the variable
+            self._variables[name] = self._variables[parent]
+            self._state[name] = True
+            super(File, self).set_coords(name, inplace=True)
             return name, type_code
 
         # The Symbol is either a Set, Parameter or Variable
@@ -168,7 +166,7 @@ class File(xr.Dataset):
         # If the GAMS method 'sameas' is invoked in a program, the resulting
         # GDX file contains an empty Set named 'SameAs' with domain (*,*). Do
         # not read this
-        if name == 'SameAs' and domain == ['*', '*'] and records == 0:
+        if name == 'SameAs' and domain == ['*', '*']:
             self._state[name] = None
             self._index[index] = None
             return
@@ -210,7 +208,7 @@ class File(xr.Dataset):
         except Exception:
             if len(data) == records:
                 pass  # All data has been read
-            else:
+            else:  # pragma: no cover
                 raise  # Some other read error
 
         # Cache the read data
@@ -239,7 +237,7 @@ class File(xr.Dataset):
 
         for i, d in enumerate(domain_):  # Iterate over dimensions
             e = set(elements[i])
-            if d.name != '*' or len(e) == 0:
+            if d.name != '*' or len(e) == 0:  # pragma: no cover
                 assert set(d.values).issuperset(e)
                 continue  # The stated domain matches the data; or no data
             # '*' is given
@@ -428,7 +426,7 @@ class File(xr.Dataset):
                 tc = self._variables[name].attrs['_gdx_type_code']
             elif isinstance(state, dict):
                 tc = state['attrs']['type_code']
-            else:
+            else:  # pragma: no cover
                 continue
             if tc == type_code:
                 names.add(name)
@@ -462,10 +460,10 @@ class File(xr.Dataset):
         """Set element access."""
         try:
             return super(File, self).__getitem__(key)
-        except KeyError:
+        except KeyError as e:
             if isinstance(self._state[key], dict):
                 debug('Lazy-loading {}'.format(key))
                 self._load_symbol_data(key)
                 return super(File, self).__getitem__(key)
             else:
-                raise
+                raise KeyError(key) from e
