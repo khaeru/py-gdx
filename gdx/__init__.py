@@ -305,31 +305,27 @@ class File(xr.Dataset):
             return
         elif attrs['type_code'] == gdxcc.GMS_DT_SET:  # GAMS Set
             if dim == 1:
-                if (domain == ['*'] or domain == [] or domain == [name]):
-                    # One-dimensional, 'top-level' Set
-                    self.coords[name] = elements[0]
-                    self.coords[name].attrs = gdx_attrs
-                    return
-                # Some subset; fill empty elements with the empty string
-                kwargs['fill_value'] = ''
+                # One-dimensional Set
+                self.coords[name] = elements[0]
+                self.coords[name].attrs = gdx_attrs
             else:
                 # Multi-dimensional Sets are mappings indexed by other Sets;
                 # elements are either 'on'/True or 'off'/False
                 kwargs['dtype'] = bool
                 kwargs['fill_value'] = False
 
-            # Don't define over the actual domain dimensions, but over the
-            # parent Set/xr.Coordinates for each dimension
-            dims = [self._root_dim(d) for d in domain]
+                # Don't define over the actual domain dimensions, but over the
+                # parent Set/xr.Coordinates for each dimension
+                dims = [self._root_dim(d) for d in domain]
 
-            # Update coords
-            self.coords.__setitem__(name, (dims, self._empty(*domain,
-                                                             **kwargs),
-                                           gdx_attrs))
+                # Update coords
+                self.coords.__setitem__(name, (dims, self._empty(*domain,
+                                                                 **kwargs),
+                                               gdx_attrs))
 
-            # Store the elements
-            for k in data.keys():
-                self[name].loc[k] = k if dim == 1 else True
+                # Store the elements
+                for k in data.keys():
+                    self[name].loc[k] = k if dim == 1 else True
         else:  # 1+-dimensional GAMS Parameters
             kwargs['dtype'] = float
             kwargs['fill_value'] = numpy.nan
@@ -432,7 +428,7 @@ class File(xr.Dataset):
                 names.add(name)
         return names
 
-    def set(self, name):
+    def set(self, name, as_dict=False):
         """Return the elements of GAMS Set *name*.
 
         Because :py:mod:`xarray` stores non-null labels for each element of a
@@ -441,7 +437,19 @@ class File(xr.Dataset):
         :func:`set()` returns the elements without these placeholders.
 
         """
-        return [k for k in self[name].to_index() if k != '']
+        assert self[name].attrs['_gdx_type_code'] == gdxcc.GMS_DT_SET, \
+            'Variable {} is not a GAMS Set'.format(name)
+        if len(self[name].dims) > 1:
+            return self[name]
+        elif as_dict:
+            from collections import OrderedDict
+            result = OrderedDict()
+            parent = self[name].attrs['_gdx_domain'][0]
+            for label in self[parent].values:
+                result[label] = label in self[name].values
+            return result
+        else:
+            return list(self[name].values)
 
     def sets(self):
         """Return a list of all GDX Sets."""

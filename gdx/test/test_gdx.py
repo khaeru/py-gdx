@@ -129,7 +129,7 @@ class TestFile:
             gdxfile['e1']
 
     def test_info1(self, gdxfile):
-        assert gdxfile.info('s1').startswith("<xarray.DataArray 's1' (s: 7)>")
+        assert gdxfile.info('s1').startswith("<xarray.DataArray 's1' (s1: 4)>")
 
     def test_info2(self, rawgdx):
         # Use a File where p1 is guaranteed to not have been loaded:
