@@ -40,14 +40,15 @@ sets
   ;
 
 parameters
-  p1(s)    'Example parameter with animal data'              / /
-  p2(t)    'Example parameter with color data'               / set.t 0 /
-  p3(s,t)  'Two-dimensional parameter'                       / set.s.y 1 /
-  p4(s1)   'Parameter defined over a subset'                 / set.s1 1 /
-  p5(*)    'Empty parameter defined over the universal set'
+  p1(s)       'Example parameter with animal data'              / /
+  p2(t)       'Example parameter with color data'               / set.t 0.1 /
+  p3(s,t)     'Two-dimensional parameter'                       / set.s.y 1 /
+  p4(s1)      'Parameter defined over a subset'                 / set.s1 1 /
+  p5(*)       'Empty parameter defined over the universal set'
+  p6(s,s1,t)  'Parameter defined over a set and its subset'     / /
   ;
 
-parameter p6(*,*) 'Parameter defined over the universal set' /
+parameter p7(*,*) 'Parameter defined over the universal set' /
   a.o   1
   r.US  2
   CA.b  3
