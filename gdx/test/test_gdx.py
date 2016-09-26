@@ -133,7 +133,7 @@ class TestFile:
 
     def test_info2(self, rawgdx):
         # Use a File where p1 is guaranteed to not have been loaded:
-        assert (gdx.File(rawgdx).info('p1') == 'unknown parameter p1(s) — 1 '
+        assert (gdx.File(rawgdx).info('p1') == 'unknown parameter p1(s), 1 '
                 'records: Example parameter with animal data')
 
     def test_dealias(self, gdxfile):

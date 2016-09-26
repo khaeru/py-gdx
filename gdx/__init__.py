@@ -11,7 +11,7 @@ import numpy
 import pandas
 import xarray as xr
 
-from .pycompat import install_aliases, filter, range, super, zip
+from .pycompat import install_aliases, filter, raise_from, range, super, zip
 install_aliases()
 
 from .api import GDX, gdxcc, type_str, vartype_str
@@ -408,7 +408,7 @@ class File(xr.Dataset):
         """Informal string representation of the Symbol with *name*."""
         if isinstance(self._state[name], dict):
             attrs = self._state[name]['attrs']
-            return '{} {}({}) — {} records: {}'.format(
+            return '{} {}({}), {} records: {}'.format(
                 attrs['type_str'], name, ','.join(attrs['domain']),
                 attrs['records'], attrs['description'])
         else:
@@ -474,4 +474,4 @@ class File(xr.Dataset):
                 self._load_symbol_data(key)
                 return super(File, self).__getitem__(key)
             else:
-                raise KeyError(key) from e
+                raise raise_from(KeyError(key), e)
