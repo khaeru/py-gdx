@@ -2,6 +2,7 @@
 *.egg-info*/
 *.pyc
 __pycache__
+dist/
 
 # Test-related files
 .cache
