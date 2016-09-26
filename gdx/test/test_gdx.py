@@ -175,6 +175,9 @@ class TestFile:
     def test_dealias(self, gdxfile):
         assert gdxfile.dealias('s_').equals(gdxfile['s'])
 
+    def test_domain(self, gdxfile, actual):
+        assert gdxfile['p6'].dims == actual['p6'].dims
+
     def test_extract(self, gdxfile, gdxfile_explicit, actual):
         # TODO add p5, p7
         for name in ['p1', 'p2', 'p3', 'p4', 'p6']:
