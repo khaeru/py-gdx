@@ -63,11 +63,19 @@ setattr(xr.Dataset, '_base_getitem', xr.Dataset.__getitem__)
 setattr(xr.Dataset, '__getitem__', _dataset_getitem)
 
 
+def _dataset_contains(self, key):
+    return self._base_contains(key) or key in self.gdx._state
+
+setattr(xr.Dataset, '_base_contains', xr.Dataset.__contains__)
+setattr(xr.Dataset, '__contains__', _dataset_contains)
+
+
 @xr.register_dataset_accessor('gdx')
 class GDXAccessor(object):
     def __init__(self, xarray_obj):
         self._obj = xarray_obj
         self._initialized = False
+        self._state = {}
 
     def _add_symbol(self, name, dim, domain, attrs):
         """Add a xray.DataArray with the data from Symbol *name*."""
@@ -254,7 +262,6 @@ class GDXAccessor(object):
 
         # Initialize private variables
         self._index = [None for _ in range(sc + 1)]
-        self._state = {}
         self._alias = {}
         self._implicit = implicit
 

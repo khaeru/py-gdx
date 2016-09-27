@@ -132,6 +132,9 @@ class TestFile:
         with pytest.raises(FileNotFoundError):
             gdx.open_dataset('nonexistent.gdx')
 
+    def test_contains(self, rawgdx):
+        assert 'p5' in gdx.open_dataset(rawgdx)
+
     def test_num_parameters(self, gdxfile, actual):
         assert len(gdxfile.gdx.parameters()) == len(actual.data_vars)
 
