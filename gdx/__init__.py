@@ -55,7 +55,7 @@ def open_dataset(filename, lazy=True, implicit=True, skip=set()):
 
 # Override xarray.Dataset.__getitem__ to add GDX lazy-loading
 def _dataset_getitem(self, key):
-    """DERP Access variables or coordinates this dataset as a
+    """Access variables or coordinates this dataset as a
     :py:class:`~xarray.DataArray`.
 
     Indexing with a list of names will return a new ``Dataset`` object.
@@ -81,15 +81,176 @@ class GDXAccessor(object):
         self._obj = xarray_obj
         self._initialized = False
 
-    def _lazy_load(self, key):
-        if not self._initialized:
-            return
-        keys = [key] if hashable(key) else key
+    def _add_symbol(self, name, dim, domain, attrs):
+        """Add a xray.DataArray with the data from Symbol *name*."""
+        # Transform the attrs for storage, unpack data
+        gdx_attrs = {'_gdx_{}'.format(k): v for k, v in attrs.items()}
+        data = self._state[name]['data']
+        elements = self._state[name]['elements']
 
-        for k in keys:
-            if k in self._state and isinstance(self._state[k], dict):
-                debug('Lazy-loading {}'.format(k))
-                self._load_symbol_data(k)
+        # Erase the cache; this also prevents __getitem__ from triggering lazy-
+        # loading, which is still in progress
+        self._state[name] = True
+
+        kwargs = {}  # Arguments to xr.Dataset.__setitem__()
+        if dim == 0:
+            # 0-D Variable or scalar Parameter
+            self._obj.__setitem__(name, ([], data.popitem()[1], gdx_attrs))
+            return
+        elif attrs['type_code'] == gdxcc.GMS_DT_SET:  # GAMS Set
+            if dim == 1:
+                # One-dimensional Set
+                self._obj.coords[name] = elements[0]
+                self._obj.coords[name].attrs = gdx_attrs
+            else:
+                # Multi-dimensional Sets are mappings indexed by other Sets;
+                # elements are either 'on'/True or 'off'/False
+                kwargs['dtype'] = bool
+                kwargs['fill_value'] = False
+
+                # Don't define over the actual domain dimensions, but over the
+                # parent Set/xr.Coordinates for each dimension
+                dims = [self._root_dim(d) for d in domain]
+
+                # Update coords
+                self._obj.coords.__setitem__(name, (dims, self._empty(*domain,
+                                             **kwargs), gdx_attrs))
+
+                # Store the elements
+                for k in data.keys():
+                    self._obj[name].loc[k] = k if dim == 1 else True
+        else:  # 1+-dimensional GAMS Parameters
+            kwargs['dtype'] = float
+            kwargs['fill_value'] = np.nan
+
+            dims = [self._root_dim(d) for d in domain]  # Same as above
+
+            # Create an empty xr.DataArray; this ensures that the data
+            # read in below has the proper form and indices
+            self._obj.__setitem__(name, (dims, self._empty(*domain, **kwargs),
+                                  gdx_attrs))
+
+            # Fill in extra keys
+            longest = np.argmax(self._obj[name].values.shape)
+            iters = []
+            for i, d in enumerate(dims):
+                if i == longest:
+                    iters.append(self._obj[d].to_index())
+                else:
+                    iters.append(cycle(self._obj[d].to_index()))
+            data.update({k: np.nan for k in set(zip(*iters)) -
+                         set(data.keys())})
+
+            # Use pandas and xarray IO methods to convert data, a dict, to a
+            # xr.DataArray of the correct shape, then extract its values
+            tmp = pandas.Series(data)
+            tmp.index.names = dims
+            tmp = xr.DataArray.from_series(tmp).reindex_like(self._obj[name])
+            self._obj[name].values = tmp.values
+
+    def _cache_data(self, name, index, dim, records):
+        """Read data for the Symbol *name* from the GDX file."""
+        # Initiate the data read. The API method returns a number of records,
+        # which should match that given by gdxSymbolInfoX in _load_symbol()
+        records2 = self._api.data_read_str_start(index)
+        assert records == records2, \
+            ('{}: gdxSymbolInfoX ({}) and gdxDataReadStrStart ({}) disagree on'
+             ' number of records.').format(name, records, records2)
+
+        # Indices of data records, one list per dimension
+        elements = [list() for _ in range(dim)]
+        # Data points. Keys are index tuples, values are data. For a 1-D Set,
+        # the data is the GDX 'string number' of the text associated with the
+        # element
+        data = {}
+        try:
+            while True:  # Loop over all records
+                labels, value, _ = self._api.data_read_str()  # Next record
+                # Update elements with the indices
+                for j, label in enumerate(labels):
+                    if label not in elements[j]:
+                        elements[j].append(label)
+                # Convert a 1-D index from a tuple to a bare string
+                key = labels[0] if dim == 1 else tuple(labels)
+                # The value is a sequence, containing the level, marginal,
+                # lower & upper bounds, etc. Store only the value (first
+                # element).
+                data[key] = value[gdxcc.GMS_VAL_LEVEL]
+        except Exception:
+            if len(data) == records:
+                pass  # All data has been read
+            else:  # pragma: no cover
+                raise  # Some other read error
+
+        # Cache the read data
+        self._state[name].update({
+            'data': data,
+            'elements': elements,
+            })
+
+    def _empty(self, *dims, **kwargs):
+        """Return an empty numpy.ndarray for a GAMS Set or Parameter."""
+        size = []
+        dtypes = []
+        for d in dims:
+            size.append(len(self._obj[d]))
+            dtypes.append(self._obj[d].dtype)
+        dtype = kwargs.pop('dtype', np.result_type(*dtypes))
+        fv = kwargs.pop('fill_value')
+        return np.full(size, fill_value=fv, dtype=dtype)
+
+    def _infer_domain(self, name, domain, elements):
+        """Infer the domain of the Symbol *name*.
+
+        Lazy GAMS modellers may create variables like myvar(*,*,*,*). If the
+        size of the universal set * is large, then attempting to instantiate a
+        xr.DataArray with this many elements may cause a MemoryError. For every
+        dimension of *name* defined on the domain '*' this method tries to find
+        a Set from the file which contains all the labels appearing in *name*'s
+        data.
+
+        """
+        if '*' not in domain:
+            return domain
+        debug('guessing a better domain for {}: {}'.format(name, domain))
+
+        # Domain as a list of references to Variables in the File/xr.Dataset
+        domain_ = [self._obj[d] for d in domain]
+
+        for i, d in enumerate(domain_):  # Iterate over dimensions
+            e = set(elements[i])
+            if d.name != '*' or len(e) == 0:  # pragma: no cover
+                assert set(d.values).issuperset(e)
+                continue  # The stated domain matches the data; or no data
+            # '*' is given
+            if (self._state[name]['attrs']['type_code'] == gdxcc.GMS_DT_PAR and
+                    self._implicit):
+                d = '_{}_{}'.format(name, i)
+                debug(('Constructing implicit set {} for dimension {} of {}\n'
+                       ' {} instead of {} elements')
+                      .format(d, name, i, len(e), len(self._obj['*'])))
+                self._obj.coords[d] = elements[i]
+                d = self._obj[d]
+            else:
+                # try to find a smaller domain for this dimension
+                # Iterate over every Set/Coordinate
+                for s in self._obj.coords.values():
+                    if s.ndim == 1 and set(s.values).issuperset(e) and \
+                            len(s) < len(d):
+                        d = s  # Found a smaller Set; use this instead
+            domain_[i] = d
+
+        # Convert the references to names
+        inferred = [d.name for d in domain_]
+
+        if domain != inferred:
+            # Store the result
+            self._state[name]['attrs']['domain_inferred'] = inferred
+            debug('…inferred {}.'.format(inferred))
+        else:
+            debug('…failed.')
+
+        return inferred
 
     def _initialize(self, filename, lazy, implicit, skip):
         self._api = GDX()
@@ -121,6 +282,16 @@ class GDXAccessor(object):
                     self._load_symbol_data(name)
 
         self._initialized = True
+
+    def _lazy_load(self, key):
+        if not self._initialized:
+            return
+        keys = [key] if hashable(key) else key
+
+        for k in keys:
+            if k in self._state and isinstance(self._state[k], dict):
+                debug('Lazy-loading {}'.format(k))
+                self._load_symbol_data(k)
 
     def _load_symbol(self, index):
         """Load the *index*-th Symbol in the GDX file."""
@@ -213,181 +384,24 @@ class GDXAccessor(object):
         # Create an xr.DataArray with the Symbol's data
         self._add_symbol(name, dim, domain, attrs)
 
-    def _cache_data(self, name, index, dim, records):
-        """Read data for the Symbol *name* from the GDX file."""
-        # Initiate the data read. The API method returns a number of records,
-        # which should match that given by gdxSymbolInfoX in _load_symbol()
-        records2 = self._api.data_read_str_start(index)
-        assert records == records2, \
-            ('{}: gdxSymbolInfoX ({}) and gdxDataReadStrStart ({}) disagree on'
-             ' number of records.').format(name, records, records2)
-
-        # Indices of data records, one list per dimension
-        elements = [list() for _ in range(dim)]
-        # Data points. Keys are index tuples, values are data. For a 1-D Set,
-        # the data is the GDX 'string number' of the text associated with the
-        # element
-        data = {}
-        try:
-            while True:  # Loop over all records
-                labels, value, _ = self._api.data_read_str()  # Next record
-                # Update elements with the indices
-                for j, label in enumerate(labels):
-                    if label not in elements[j]:
-                        elements[j].append(label)
-                # Convert a 1-D index from a tuple to a bare string
-                key = labels[0] if dim == 1 else tuple(labels)
-                # The value is a sequence, containing the level, marginal,
-                # lower & upper bounds, etc. Store only the value (first
-                # element).
-                data[key] = value[gdxcc.GMS_VAL_LEVEL]
-        except Exception:
-            if len(data) == records:
-                pass  # All data has been read
+    def _loaded_and_cached(self, type_code):
+        """Return a list of loaded and not-loaded Symbols of *type_code*."""
+        names = set()
+        for name, state in self._state.items():
+            if state is True:
+                tc = self._obj._variables[name].attrs['_gdx_type_code']
+            elif isinstance(state, dict):
+                tc = state['attrs']['type_code']
             else:  # pragma: no cover
-                raise  # Some other read error
-
-        # Cache the read data
-        self._state[name].update({
-            'data': data,
-            'elements': elements,
-            })
-
-    def _infer_domain(self, name, domain, elements):
-        """Infer the domain of the Symbol *name*.
-
-        Lazy GAMS modellers may create variables like myvar(*,*,*,*). If the
-        size of the universal set * is large, then attempting to instantiate a
-        xr.DataArray with this many elements may cause a MemoryError. For every
-        dimension of *name* defined on the domain '*' this method tries to find
-        a Set from the file which contains all the labels appearing in *name*'s
-        data.
-
-        """
-        if '*' not in domain:
-            return domain
-        debug('guessing a better domain for {}: {}'.format(name, domain))
-
-        # Domain as a list of references to Variables in the File/xr.Dataset
-        domain_ = [self._obj[d] for d in domain]
-
-        for i, d in enumerate(domain_):  # Iterate over dimensions
-            e = set(elements[i])
-            if d.name != '*' or len(e) == 0:  # pragma: no cover
-                assert set(d.values).issuperset(e)
-                continue  # The stated domain matches the data; or no data
-            # '*' is given
-            if (self._state[name]['attrs']['type_code'] == gdxcc.GMS_DT_PAR and
-                    self._implicit):
-                d = '_{}_{}'.format(name, i)
-                debug(('Constructing implicit set {} for dimension {} of {}\n'
-                       ' {} instead of {} elements')
-                      .format(d, name, i, len(e), len(self._obj['*'])))
-                self._obj.coords[d] = elements[i]
-                d = self._obj[d]
-            else:
-                # try to find a smaller domain for this dimension
-                # Iterate over every Set/Coordinate
-                for s in self._obj.coords.values():
-                    if s.ndim == 1 and set(s.values).issuperset(e) and \
-                            len(s) < len(d):
-                        d = s  # Found a smaller Set; use this instead
-            domain_[i] = d
-
-        # Convert the references to names
-        inferred = [d.name for d in domain_]
-
-        if domain != inferred:
-            # Store the result
-            self._state[name]['attrs']['domain_inferred'] = inferred
-            debug('…inferred {}.'.format(inferred))
-        else:
-            debug('…failed.')
-
-        return inferred
+                continue
+            if tc == type_code:
+                names.add(name)
+        return names
 
     def _root_dim(self, dim):
         """Return the ultimate ancestor of the 1-D Set *dim*."""
         parent = self._obj[dim].dims[0]
         return dim if parent == dim else self._root_dim(parent)
-
-    def _empty(self, *dims, **kwargs):
-        """Return an empty numpy.ndarray for a GAMS Set or Parameter."""
-        size = []
-        dtypes = []
-        for d in dims:
-            size.append(len(self._obj[d]))
-            dtypes.append(self._obj[d].dtype)
-        dtype = kwargs.pop('dtype', np.result_type(*dtypes))
-        fv = kwargs.pop('fill_value')
-        return np.full(size, fill_value=fv, dtype=dtype)
-
-    def _add_symbol(self, name, dim, domain, attrs):
-        """Add a xray.DataArray with the data from Symbol *name*."""
-        # Transform the attrs for storage, unpack data
-        gdx_attrs = {'_gdx_{}'.format(k): v for k, v in attrs.items()}
-        data = self._state[name]['data']
-        elements = self._state[name]['elements']
-
-        # Erase the cache; this also prevents __getitem__ from triggering lazy-
-        # loading, which is still in progress
-        self._state[name] = True
-
-        kwargs = {}  # Arguments to xr.Dataset.__setitem__()
-        if dim == 0:
-            # 0-D Variable or scalar Parameter
-            self._obj.__setitem__(name, ([], data.popitem()[1], gdx_attrs))
-            return
-        elif attrs['type_code'] == gdxcc.GMS_DT_SET:  # GAMS Set
-            if dim == 1:
-                # One-dimensional Set
-                self._obj.coords[name] = elements[0]
-                self._obj.coords[name].attrs = gdx_attrs
-            else:
-                # Multi-dimensional Sets are mappings indexed by other Sets;
-                # elements are either 'on'/True or 'off'/False
-                kwargs['dtype'] = bool
-                kwargs['fill_value'] = False
-
-                # Don't define over the actual domain dimensions, but over the
-                # parent Set/xr.Coordinates for each dimension
-                dims = [self._root_dim(d) for d in domain]
-
-                # Update coords
-                self._obj.coords.__setitem__(name, (dims, self._empty(*domain,
-                                             **kwargs), gdx_attrs))
-
-                # Store the elements
-                for k in data.keys():
-                    self._obj[name].loc[k] = k if dim == 1 else True
-        else:  # 1+-dimensional GAMS Parameters
-            kwargs['dtype'] = float
-            kwargs['fill_value'] = np.nan
-
-            dims = [self._root_dim(d) for d in domain]  # Same as above
-
-            # Create an empty xr.DataArray; this ensures that the data
-            # read in below has the proper form and indices
-            self._obj.__setitem__(name, (dims, self._empty(*domain, **kwargs),
-                                  gdx_attrs))
-
-            # Fill in extra keys
-            longest = np.argmax(self._obj[name].values.shape)
-            iters = []
-            for i, d in enumerate(dims):
-                if i == longest:
-                    iters.append(self._obj[d].to_index())
-                else:
-                    iters.append(cycle(self._obj[d].to_index()))
-            data.update({k: np.nan for k in set(zip(*iters)) -
-                         set(data.keys())})
-
-            # Use pandas and xarray IO methods to convert data, a dict, to a
-            # xr.DataArray of the correct shape, then extract its values
-            tmp = pandas.Series(data)
-            tmp.index.names = dims
-            tmp = xr.DataArray.from_series(tmp).reindex_like(self._obj[name])
-            self._obj[name].values = tmp.values
 
     def dealias(self, name):
         """Identify the GDX Symbol that *name* refers to, and return the
@@ -450,19 +464,10 @@ class GDXAccessor(object):
         else:
             return repr(self._obj[name])
 
-    def _loaded_and_cached(self, type_code):
-        """Return a list of loaded and not-loaded Symbols of *type_code*."""
-        names = set()
-        for name, state in self._state.items():
-            if state is True:
-                tc = self._obj._variables[name].attrs['_gdx_type_code']
-            elif isinstance(state, dict):
-                tc = state['attrs']['type_code']
-            else:  # pragma: no cover
-                continue
-            if tc == type_code:
-                names.add(name)
-        return names
+    def get_symbol_by_index(self, index):
+        """Retrieve the GAMS Symbol from the *index*-th position of the
+        :class:`File`."""
+        return self._obj[self._index[index]]
 
     def set(self, name, as_dict=False):
         """Return the elements of GAMS Set *name*.
@@ -494,8 +499,3 @@ class GDXAccessor(object):
     def parameters(self):
         """Return a list of all GDX Parameters."""
         return self._loaded_and_cached(gdxcc.GMS_DT_PAR)
-
-    def get_symbol_by_index(self, index):
-        """Retrieve the GAMS Symbol from the *index*-th position of the
-        :class:`File`."""
-        return self._obj[self._index[index]]
