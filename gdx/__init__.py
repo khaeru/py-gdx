@@ -55,24 +55,12 @@ def open_dataset(filename, lazy=True, implicit=True, skip=set()):
 
 # Override xarray.Dataset.__getitem__ to add GDX lazy-loading
 def _dataset_getitem(self, key):
-    """Access variables or coordinates this dataset as a
-    :py:class:`~xarray.DataArray`.
-
-    Indexing with a list of names will return a new ``Dataset`` object.
-    """
-    if is_dict_like(key):
-        return self.isel(**key)
-
-    # GDX lazy-loading
+    """Override :py:class:`~xarray.Dataset` __getitem__ method."""
     self.gdx._lazy_load(key)
+    return self._base_getitem(key)
 
-    if hashable(key):
-        return self._construct_dataarray(key)
-    else:
-        return self._copy_listed(np.asarray(key))
-
-
-xr.Dataset.__getitem__ = _dataset_getitem
+setattr(xr.Dataset, '_base_getitem', xr.Dataset.__getitem__)
+setattr(xr.Dataset, '__getitem__', _dataset_getitem)
 
 
 @xr.register_dataset_accessor('gdx')
@@ -284,7 +272,7 @@ class GDXAccessor(object):
         self._initialized = True
 
     def _lazy_load(self, key):
-        if not self._initialized:
+        if not self._initialized or is_dict_like(key):
             return
         keys = [key] if hashable(key) else key
 
