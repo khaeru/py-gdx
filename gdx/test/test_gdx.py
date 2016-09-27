@@ -35,13 +35,13 @@ def rawgdx(request):
 @pytest.fixture(scope='class')
 def gdxfile(rawgdx):
     """A gdx.File fixture."""
-    return gdx.File(rawgdx)
+    return gdx.open_dataset(rawgdx)
 
 
 @pytest.fixture(scope='class')
 def gdxfile_explicit(rawgdx):
     """A gdx.File fixture, instantiated with implicit=False."""
-    return gdx.File(rawgdx, implicit=False)
+    return gdx.open_dataset(rawgdx, implicit=False)
 
 
 @pytest.fixture(scope='session')
@@ -127,34 +127,29 @@ class TestAPI:
 
 class TestFile:
     def test_init(self, rawgdx):
-        gdx.File(rawgdx)
-        gdx.File(rawgdx, lazy=False)
+        gdx.open_dataset(rawgdx)
+        gdx.open_dataset(rawgdx, lazy=False)
         with pytest.raises(FileNotFoundError):
-            gdx.File('nonexistent.gdx')
+            gdx.open_dataset('nonexistent.gdx')
 
     def test_num_parameters(self, gdxfile, actual):
-        print(gdxfile.parameters())
-        assert len(gdxfile.parameters()) == len(actual.data_vars)
+        assert len(gdxfile.gdx.parameters()) == len(actual.data_vars)
 
     def test_num_sets(self, gdxfile, actual):
-        assert len(gdxfile.sets()) == len(actual.coords)
+        assert len(gdxfile.gdx.sets()) == len(actual.coords)
 
     def test_get_symbol(self, gdxfile):
         gdxfile['s']
+        gdxfile['p1']
 
     def test_get_symbol_by_index(self, gdxfile, actual):
         for name in actual:
-            sym = gdxfile.get_symbol_by_index(actual[name].attrs['_gdx_index'])
+            sym = gdxfile.gdx.get_symbol_by_index(
+                actual[name].attrs['_gdx_index'])
             assert sym.name == name
         # Giving too high an index results in IndexError
         with pytest.raises(IndexError):
-            gdxfile.get_symbol_by_index(gdxfile.attrs['symbol_count'] + 1)
-
-    def test_getattr(self, gdxfile, actual):
-        for name in actual:
-            getattr(gdxfile, name)
-        with pytest.raises(AttributeError):
-            gdxfile.notasymbolname
+            gdxfile.gdx.get_symbol_by_index(gdxfile.attrs['symbol_count'] + 1)
 
     def test_getitem(self, gdxfile, actual):
         for name in actual:
@@ -165,15 +160,17 @@ class TestFile:
             gdxfile['e1']
 
     def test_info1(self, gdxfile):
-        assert gdxfile.info('s1').startswith("<xarray.DataArray 's1' (s1: 4)>")
+        assert gdxfile.gdx.info('s1') \
+                      .startswith("<xarray.DataArray 's1' (s1: 4)>")
 
     def test_info2(self, rawgdx):
         # Use a File where p1 is guaranteed to not have been loaded:
-        assert (gdx.File(rawgdx).info('p1') == 'unknown parameter p1(s), 1 '
-                'records: Example parameter with animal data')
+        assert (gdx.open_dataset(rawgdx).gdx.info('p1') ==
+                'unknown parameter p1(s), 1 records: Example parameter with '
+                'animal data')
 
     def test_dealias(self, gdxfile):
-        assert gdxfile.dealias('s_').equals(gdxfile['s'])
+        assert gdxfile.gdx.dealias('s_').equals(gdxfile['s'])
 
     def test_domain(self, gdxfile, actual):
         assert gdxfile['p6'].dims == actual['p6'].dims
@@ -181,12 +178,12 @@ class TestFile:
     def test_extract(self, gdxfile, gdxfile_explicit, actual):
         # TODO add p5, p7
         for name in ['p1', 'p2', 'p3', 'p4', 'p6']:
-            assert gdxfile.extract(name).equals(actual[name])
+            assert gdxfile.gdx.extract(name).equals(actual[name])
 
-        gdxfile_explicit.extract('p5')
+        gdxfile_explicit.gdx.extract('p5')
 
         with pytest.raises(KeyError):
-            gdxfile.extract('notasymbolname')
+            gdxfile.gdx.extract('notasymbolname')
 
     def test_implicit(self, gdxfile):
         assert gdxfile['p7'].shape == (3, 3)
@@ -195,8 +192,8 @@ class TestFile:
 class TestSet:
     def test_len(self, gdxfile, actual):
         assert len(gdxfile.s) == len(actual['s'])
-        assert len(gdxfile.set('s1')) == len(actual['s1'])
-        assert len(gdxfile.set('s2')) == len(actual['s2'])
+        assert len(gdxfile.gdx.set('s1')) == len(actual['s1'])
+        assert len(gdxfile.gdx.set('s2')) == len(actual['s2'])
 
     def test_getitem(self, gdxfile):
         for i in range(len(gdxfile.s)):
