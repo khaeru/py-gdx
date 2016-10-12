@@ -9,7 +9,7 @@ PyGDX is a Python package for accessing data stored in *GAMS Data eXchange* (GDX
 
 Originally inspired by the similar package, also named [py-gdx, by Geoff Leyland](https://github.com/geoffleyland/py-gdx), this version makes use of [xarray](http://xarray.pydata.org) to provide labelled data structures which can be easily manipulated with [NumPy](http://www.numpy.org) for calculations and plotting.
 
-**Documentation** is available at http://pygdx.readthedocs.org, built automatically from the contents of the Github repository.
+**Documentation** is available at https://pygdx.readthedocs.io, built automatically from the contents of the Github repository.
 
 PyGDX is provided under the **MIT License** (see `LICENSE`).
 
