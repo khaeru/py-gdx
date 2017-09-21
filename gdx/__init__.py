@@ -2,10 +2,7 @@
 from __future__ import (absolute_import, division, print_function,
                         unicode_literals)
 from itertools import cycle
-from logging import debug, info
-# commented: for debugging
-# import logging
-# logging.basicConfig(level=logging.DEBUG)
+import logging
 
 import numpy
 import pandas
@@ -15,6 +12,11 @@ from .pycompat import install_aliases, filter, raise_from, range, super, zip
 install_aliases()
 
 from .api import GDX, gdxcc, type_str, vartype_str
+
+
+logger = logging.getLogger(__name__)
+debug = logger.debug
+info = logger.info
 
 
 __version__ = '2'
