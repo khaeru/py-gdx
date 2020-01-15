@@ -15,7 +15,7 @@ import sys, os
 
 
 class Mock(object):
-    """Per http://read-the-docs.readthedocs.org/en/latest/faq.html#i-get-
+    """Per https://read-the-docs.readthedocs.io/en/latest/faq.html#i-get-
     import-errors-on-libraries-that-depend-on-c-modules"""
     __all__ = []
 
